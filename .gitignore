@@ -12,6 +12,10 @@ yarn-error.log*
 # Build output
 dist/
 build/
+.gradle/
+client/android/.gradle/
+client/android/app/build/
+client/android/build/
 
 # Local databases
 server/data/loki_store.json

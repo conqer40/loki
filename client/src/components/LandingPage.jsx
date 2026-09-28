@@ -336,7 +336,7 @@ export default function LandingPage({ onOpenChat, onOpenAdmin }) {
               <Smartphone className="w-5 h-5 text-black group-hover:rotate-12 transition-transform duration-300" />
               <div className="text-right">
                 <div className="leading-tight text-sm font-black">تحميل تطبيق الأندرويد APK</div>
-                <div className="text-[10px] text-black/80 font-medium">إصدار v1.0 • حجم 14 MB • تثبيت مباشر</div>
+                <div className="text-[10px] text-black/80 font-medium">إصدار v1.0 • حجم 5.1 MB • تثبيت مباشر فوري</div>
               </div>
               <Download className="w-4 h-4 mr-1 text-black animate-bounce" />
             </a>
