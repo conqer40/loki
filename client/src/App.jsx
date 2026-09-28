@@ -17,8 +17,9 @@ export default function App() {
     const path = window.location.pathname;
     const hash = window.location.hash;
     if (path.startsWith("/admin") || hash === "#admin") return "admin";
-    if (path.startsWith("/landing") || hash === "#landing") return "landing";
-    return "chat";
+    if (path.startsWith("/chat") || hash === "#chat") return "chat";
+    // By default on the website, show the luxury Landing Page!
+    return "landing";
   });
 
   // User Profile
