@@ -1,0 +1,18 @@
+{
+  "name": "Loki - رفيقك النفسي",
+  "short_name": "Loki",
+  "description": "المساعد النفسي والصديق الدافئ للمحادثة والصوت المباشر",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#131314",
+  "theme_color": "#131314",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

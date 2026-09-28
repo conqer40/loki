@@ -1,0 +1,24 @@
+# Node dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment secrets
+.env
+.env.local
+.env.*.local
+
+# Build output
+dist/
+build/
+
+# Local databases
+server/data/loki_store.json
+
+# Zip archives
+stitch_loki_ai_companion_ui.zip
+
+# OS files
+.DS_Store
+Thumbs.db

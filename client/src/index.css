@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  html, body, #root {
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background-color: #131314;
+    color: #e3e3e3;
+    font-family: 'Readex Pro', 'Alexandria', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+}
+
+/* Custom Gemini / ChatGPT scrollbar */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+}
+
+/* Gemini Live Fluid Morphing Orb */
+@keyframes morphBlob {
+  0%, 100% {
+    border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%;
+    transform: rotate(0deg) scale(1);
+  }
+  33% {
+    border-radius: 70% 30% 46% 54% / 30% 29% 71% 70%;
+    transform: rotate(120deg) scale(1.05);
+  }
+  66% {
+    border-radius: 100% 60% 60% 100% / 100% 100% 60% 60%;
+    transform: rotate(240deg) scale(0.96);
+  }
+}
+
+@keyframes pulseGlowSlow {
+  0%, 100% {
+    filter: drop-shadow(0 0 25px rgba(124, 58, 237, 0.4)) drop-shadow(0 0 50px rgba(56, 189, 248, 0.25));
+  }
+  50% {
+    filter: drop-shadow(0 0 40px rgba(236, 72, 153, 0.5)) drop-shadow(0 0 80px rgba(124, 58, 237, 0.4));
+  }
+}
+
+.animate-morph-orb {
+  animation: morphBlob 9s ease-in-out infinite, pulseGlowSlow 4s ease-in-out infinite;
+}
+
+.gemini-gradient-text {
+  background: linear-gradient(135deg, #a8c7fa 0%, #c48df6 50%, #f43f5e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gemini-card {
+  background-color: #1e1f20;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
