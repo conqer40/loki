@@ -3,6 +3,7 @@ import AndroidTopBar from "./components/AndroidTopBar";
 import AndroidDrawer from "./components/AndroidDrawer";
 import AndroidInputBar from "./components/AndroidInputBar";
 import AndroidChatMessage from "./components/AndroidChatMessage";
+import AndroidBottomNav from "./components/AndroidBottomNav";
 import GeminiLiveModal from "./components/GeminiLiveModal";
 import BreathingModal from "./components/BreathingModal";
 import SettingsModal from "./components/SettingsModal";
@@ -10,10 +11,24 @@ import MoodSelector from "./components/MoodSelector";
 import UserOnboardingModal from "./components/UserOnboardingModal";
 import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./components/LandingPage";
+import { askLoki } from "./services/lokiBrain";
 
 export default function App() {
+  // Detect if running inside native Android App (Capacitor or WebView)
+  const isNativeApp =
+    typeof window !== "undefined" &&
+    (window.Capacitor?.isNativePlatform?.() ||
+      window.location.protocol === "capacitor:" ||
+      window.location.protocol === "file:" ||
+      window.location.hostname === "localhost" ||
+      window.location.hostname === "127.0.0.1" ||
+      navigator.userAgent.includes("wv") ||
+      navigator.userAgent.includes("Capacitor"));
+
   // Routing: Companion Chat vs Admin Dashboard vs Landing
   const [currentView, setCurrentView] = useState(() => {
+    // If inside native Android APK, ALWAYS show the companion chat! NEVER landing!
+    if (isNativeApp) return "chat";
     const path = window.location.pathname;
     const hash = window.location.hash;
     if (path.startsWith("/admin") || hash === "#admin") return "admin";
@@ -80,7 +95,7 @@ export default function App() {
   // Settings: Powered exclusively by Google Gemini
   const [apiKey, setApiKey] = useState(() => localStorage.getItem("loki_gemini_key") || "");
   const [voice, setVoice] = useState(() => localStorage.getItem("loki_voice") || "Puck");
-  const [autoSpeak, setAutoSpeak] = useState(false);
+  const [autoSpeak, setAutoSpeak] = useState(() => localStorage.getItem("loki_autospeak") !== "false");
 
   // Modals & Navigation
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -100,6 +115,10 @@ export default function App() {
   // Handle URL change
   useEffect(() => {
     const handlePopState = () => {
+      if (isNativeApp) {
+        setCurrentView("chat");
+        return;
+      }
       const path = window.location.pathname;
       const hash = window.location.hash;
       if (path.startsWith("/admin") || hash === "#admin") {
@@ -112,7 +131,7 @@ export default function App() {
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [isNativeApp]);
 
   const openAdminDashboard = () => {
     window.history.pushState({}, "", "/admin");
@@ -125,6 +144,7 @@ export default function App() {
   };
 
   const openLanding = () => {
+    if (isNativeApp) return;
     window.history.pushState({}, "", "/");
     setCurrentView("landing");
   };
@@ -171,7 +191,7 @@ export default function App() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert("خاصية الإملاء الصوتي تتطلب متصفح Chrome أو Edge.");
+      alert("خاصية الإملاء الصوتي تتطلب متصفح يدعم الميكروفون مثل Chrome أو WebView.");
       return;
     }
 
@@ -189,7 +209,38 @@ export default function App() {
     }
   };
 
-  // Play Gemini Human Voice directly
+  // Fallback Native Speech Synthesis
+  const fallbackSpeech = (text, messageId) => {
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+        const clean = text.replace(/<<<[\s\S]*?>>>/g, "").replace(/[*_#]/g, "").trim();
+        const utterance = new SpeechSynthesisUtterance(clean);
+        utterance.lang = "ar-EG";
+        utterance.rate = 1.0;
+        utterance.pitch = 0.95;
+        utterance.onend = () => {
+          setIsPlayingAudio(false);
+          setCurrentPlayingId(null);
+        };
+        utterance.onerror = () => {
+          setIsPlayingAudio(false);
+          setCurrentPlayingId(null);
+        };
+        setIsPlayingAudio(true);
+        setCurrentPlayingId(messageId);
+        window.speechSynthesis.speak(utterance);
+      } catch {
+        setIsPlayingAudio(false);
+        setCurrentPlayingId(null);
+      }
+    } else {
+      setIsPlayingAudio(false);
+      setCurrentPlayingId(null);
+    }
+  };
+
+  // Play Loki Warm Voice directly
   const speakMessage = async (text, messageId) => {
     if (!text) return;
 
@@ -203,11 +254,16 @@ export default function App() {
     setCurrentPlayingId(messageId);
 
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
       const response = await fetch("/api/tts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text, voice, apiKey }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok) throw new Error("TTS failed");
 
@@ -227,14 +283,11 @@ export default function App() {
           setCurrentPlayingId(null);
         };
         audioRef.current.onerror = () => {
-          setIsPlayingAudio(false);
-          setCurrentPlayingId(null);
+          fallbackSpeech(text, messageId);
         };
       }
-    } catch (err) {
-      console.warn("Audio play error:", err);
-      setIsPlayingAudio(false);
-      setCurrentPlayingId(null);
+    } catch {
+      fallbackSpeech(text, messageId);
     }
   };
 
@@ -242,6 +295,11 @@ export default function App() {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
+    }
+    if (typeof window !== "undefined" && "speechSynthesis" in window) {
+      try {
+        window.speechSynthesis.cancel();
+      } catch {}
     }
     setIsPlayingAudio(false);
     setCurrentPlayingId(null);
@@ -272,23 +330,13 @@ export default function App() {
     setIsLoading(true);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: content,
-          image: currentImg,
-          history: newMessages.slice(-6),
-          userMood: currentMood,
-          apiKey: apiKey || undefined,
-          userId: userProfile?.id,
-          userName: userProfile?.name,
-          userPhone: userProfile?.phone,
-        }),
+      const data = await askLoki({
+        message: content,
+        image: currentImg,
+        history: newMessages.slice(-6),
+        userMood: currentMood,
+        apiKey: apiKey || undefined,
       });
-
-      const data = await res.json();
-      if (!data.success && !data.reply) throw new Error(data.error || "خطأ في الرد");
 
       const lokiMsgId = (Date.now() + 1).toString();
       const lokiMsg = {
@@ -301,19 +349,40 @@ export default function App() {
 
       setMessages((prev) => [...prev, lokiMsg]);
 
+      // Async sync to server database in background for Admin monitoring
+      if (userProfile?.id) {
+        fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: content,
+            image: currentImg,
+            history: [],
+            userId: userProfile.id,
+            userName: userProfile.name,
+            userPhone: userProfile.phone,
+          }),
+        }).catch(() => {});
+      }
+
       if (autoSpeak) {
         speakMessage(data.reply, lokiMsgId);
       }
     } catch (err) {
       console.error("Chat error:", err);
+      const fallbackMsg = "يا صاحبي أنا معاك وسامعك.. احكيلي تاني وسيبك من أي دوشة.";
+      const lokiMsgId = (Date.now() + 1).toString();
       const errorMsg = {
-        id: (Date.now() + 1).toString(),
+        id: lokiMsgId,
         sender: "loki",
-        text: "يا صاحبي حصل تشويش بسيط.. أنا جنبك، ابعت تاني.",
+        text: fallbackMsg,
         timestamp: new Date().toLocaleTimeString("ar-EG", { hour: "2-digit", minute: "2-digit" }),
         suggestions: ["هحاول أبعت تاني", "إزيك يا لوكي؟"],
       };
       setMessages((prev) => [...prev, errorMsg]);
+      if (autoSpeak) {
+        speakMessage(fallbackMsg, lokiMsgId);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -379,6 +448,7 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenBreathing={() => setIsBreathingOpen(true)}
         onOpenAdmin={openAdminDashboard}
+        isNativeApp={isNativeApp}
       />
 
       {/* Stitch Emotional Sanctuary Sub-Bar */}
@@ -391,22 +461,24 @@ export default function App() {
           <span className="text-[11px] text-slate-300">مساحتك الآمنة مشفرة بالكامل 🌿</span>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <a
-            href="/downloads/loki.apk"
-            download="loki-ai-companion.apk"
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-bold border border-emerald-500/30 transition active:scale-95"
-            title="تحميل تطبيق الأندرويد"
-          >
-            <span>تحميل APK</span>
-          </a>
-          <button
-            onClick={openAdminDashboard}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[11px] font-semibold border border-purple-500/30 transition active:scale-95"
-          >
-            <span>لوحة الأدمن</span>
-          </button>
-        </div>
+        {!isNativeApp && (
+          <div className="flex items-center gap-1.5">
+            <a
+              href="/downloads/loki.apk"
+              download="loki-ai-companion.apk"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-bold border border-emerald-500/30 transition active:scale-95"
+              title="تحميل تطبيق الأندرويد"
+            >
+              <span>تحميل APK</span>
+            </a>
+            <button
+              onClick={openAdminDashboard}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[11px] font-semibold border border-purple-500/30 transition active:scale-95"
+            >
+              <span>لوحة الأدمن</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Mood Selector Dropdown */}

@@ -7,6 +7,7 @@ export default function AndroidTopBar({
   onOpenSettings,
   onOpenBreathing,
   onOpenAdmin,
+  isNativeApp = false,
 }) {
   return (
     <header className="flex items-center justify-between px-3 sm:px-5 py-2.5 bg-[#131314]/90 backdrop-blur-md border-b border-white/5 z-20 select-none">
@@ -41,16 +42,18 @@ export default function AndroidTopBar({
 
       {/* Left Actions: APK Download + Admin + Breathing + New Chat */}
       <div className="flex items-center gap-1 sm:gap-1.5">
-        {/* Direct APK Download Button */}
-        <a
-          href="/downloads/loki.apk"
-          download="loki-ai-companion.apk"
-          className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-[11px] font-bold text-emerald-300 transition active:scale-95 shadow-sm"
-          title="تحميل تطبيق الأندرويد APK"
-        >
-          <Download className="w-3 h-3 text-emerald-400" />
-          <span>تحميل APK</span>
-        </a>
+        {/* Direct APK Download Button (Visible only on web) */}
+        {!isNativeApp && (
+          <a
+            href="/downloads/loki.apk"
+            download="loki-ai-companion.apk"
+            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-[11px] font-bold text-emerald-300 transition active:scale-95 shadow-sm"
+            title="تحميل تطبيق الأندرويد APK"
+          >
+            <Download className="w-3 h-3 text-emerald-400" />
+            <span>تحميل APK</span>
+          </a>
+        )}
 
         {/* Admin Dashboard Entry */}
         <button
