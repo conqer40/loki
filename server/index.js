@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import { queryGemini, generateFallbackResponse } from "./loki_brain.js";
-import { generateGeminiTTS } from "./tts_helper.js";
+import { generateGeminiTTS, generateEdgeTTS } from "./tts_helper.js";
 import {
   registerOrUpdateUser,
   saveMessage,
@@ -159,25 +159,35 @@ app.post("/api/chat", async (req, res) => {
   });
 });
 
-// Text-to-Speech Endpoint: Google Gemini Native Human Voice
+// Text-to-Speech Endpoint: Authentic Egyptian Male Neural Voice (ar-EG-ShakirNeural)
 app.post("/api/tts", async (req, res) => {
-  const { text, voice = "Puck", apiKey } = req.body;
+  const { text, voice = "ar-EG-ShakirNeural", apiKey } = req.body;
 
   if (!text) {
     return res.status(400).json({ error: "Text is required" });
   }
 
-  const effectiveKey = apiKey || process.env.GEMINI_API_KEY;
-
+  // 1. Primary: Microsoft Edge Neural TTS (ar-EG-ShakirNeural - Natural Egyptian Male Voice)
   try {
-    const voiceName = voice === "Fenrir" ? "Fenrir" : "Puck";
-    const wavBuffer = await generateGeminiTTS(text, voiceName, effectiveKey);
+    const mp3Buffer = await generateEdgeTTS(text, voice);
+    res.setHeader("Content-Type", "audio/mpeg");
+    res.setHeader("Content-Length", mp3Buffer.length);
+    res.setHeader("Cache-Control", "no-cache");
+    return res.send(mp3Buffer);
+  } catch (edgeErr) {
+    console.warn("Edge TTS failed, falling back to Gemini:", edgeErr.message);
+  }
+
+  // 2. Fallback: Google Gemini Native Audio
+  try {
+    const effectiveKey = apiKey || process.env.GEMINI_API_KEY;
+    const wavBuffer = await generateGeminiTTS(text, "Puck", effectiveKey);
     res.setHeader("Content-Type", "audio/wav");
     res.setHeader("Content-Length", wavBuffer.length);
     res.setHeader("Cache-Control", "no-cache");
     return res.send(wavBuffer);
   } catch (err) {
-    console.error("Gemini TTS generation error:", err);
+    console.error("All TTS generation methods failed:", err);
     res.status(500).json({ error: err.message || "Failed to generate human voice" });
   }
 });

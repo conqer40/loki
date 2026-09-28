@@ -1,5 +1,23 @@
 import dotenv from "dotenv";
+import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 dotenv.config();
+
+// Generate Natural Egyptian Male Voice via Microsoft Edge Neural TTS
+export async function generateEdgeTTS(text, voiceName = "ar-EG-ShakirNeural") {
+  const cleanText = sanitizeForSpeech(text);
+  if (!cleanText) throw new Error("Empty text");
+
+  const tts = new MsEdgeTTS();
+  await tts.setMetadata(voiceName, OUTPUT_FORMAT.AUDIO_24KHZ_48KBITRATE_MONO_MP3);
+  const { audioStream } = tts.toStream(cleanText);
+
+  const chunks = [];
+  return new Promise((resolve, reject) => {
+    audioStream.on("data", (chunk) => chunks.push(chunk));
+    audioStream.on("end", () => resolve(Buffer.concat(chunks)));
+    audioStream.on("error", reject);
+  });
+}
 
 // Convert raw 24000Hz 16-bit mono PCM into standard WAV format
 export function pcmToWav(pcmBuffer, sampleRate = 24000) {
