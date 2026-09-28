@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { PhoneOff, Mic, MicOff, Volume2, Sparkles, MessageSquare, Shield, Radio, Keyboard, X, Send } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Volume2, Sparkles, MessageSquare, Radio, Keyboard, X, Send, Hand } from "lucide-react";
 import { askLoki } from "../services/lokiBrain";
 import { playLokiVoice, stopLokiVoice } from "../services/lokiAudio";
 
@@ -7,7 +7,6 @@ export default function GeminiLiveModal({
   isOpen,
   onClose,
   onSendMessage,
-  voice,
   apiKey,
   currentMood,
 }) {
@@ -23,6 +22,7 @@ export default function GeminiLiveModal({
 
   const recognitionRef = useRef(null);
   const isCallActiveRef = useRef(false);
+  const isLokiTalkingRef = useRef(false);
   const silenceTimerRef = useRef(null);
   const latestSpeechRef = useRef("");
   const timerIntervalRef = useRef(null);
@@ -46,25 +46,23 @@ export default function GeminiLiveModal({
     setLiveTranscript("");
     setLastLokiReply("");
     setIsLokiSpeakingState(false);
+    isLokiTalkingRef.current = false;
 
     // Call duration timer
     timerIntervalRef.current = setInterval(() => {
       setCallDuration((prev) => prev + 1);
     }, 1000);
 
-    // Connect call and start continuous mic session
+    // Connect call and start session
     const connectTimer = setTimeout(() => {
       if (!isCallActiveRef.current) return;
       setCallStatus("active");
-
-      // Start continuous speech recognition
-      startContinuousMic();
 
       // Loki speaks welcoming greeting on phone connection
       const greeting = "ألو يا صاحبي، معاك وسامعك.. احكيلي عامل إيه النهاردة وطمني عليك؟";
       setLastLokiReply(greeting);
       speakLoki(greeting);
-    }, 800);
+    }, 700);
 
     return () => {
       clearTimeout(connectTimer);
@@ -72,9 +70,10 @@ export default function GeminiLiveModal({
     };
   }, [isOpen]);
 
-  // Clean up and end call
+  // Clean up and end call session
   const endCallSession = () => {
     isCallActiveRef.current = false;
+    isLokiTalkingRef.current = false;
     stopLokiVoice();
     setIsLokiSpeakingState(false);
 
@@ -88,18 +87,25 @@ export default function GeminiLiveModal({
       silenceTimerRef.current = null;
     }
 
+    stopMicSafely();
+  };
+
+  // Safely stop microphone
+  const stopMicSafely = () => {
     if (recognitionRef.current) {
       try {
         recognitionRef.current.onend = null;
+        recognitionRef.current.onerror = null;
+        recognitionRef.current.onresult = null;
         recognitionRef.current.abort();
       } catch {}
       recognitionRef.current = null;
     }
   };
 
-  // Continuous Microphone Session (Like a real phone call)
+  // Start Clean Microphone Session (Only active when Loki is NOT talking to avoid self-echo)
   const startContinuousMic = () => {
-    if (!isCallActiveRef.current) return;
+    if (!isCallActiveRef.current || isMuted || isLokiTalkingRef.current) return;
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -108,12 +114,7 @@ export default function GeminiLiveModal({
     }
 
     try {
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.onend = null;
-          recognitionRef.current.abort();
-        } catch {}
-      }
+      stopMicSafely();
 
       const rec = new SpeechRecognition();
       rec.lang = "ar-EG";
@@ -121,14 +122,8 @@ export default function GeminiLiveModal({
       rec.interimResults = true;
       rec.maxAlternatives = 1;
 
-      rec.onstart = () => {};
-
       rec.onresult = (event) => {
-        if (!isCallActiveRef.current) return;
-
-        // REAL BARGE-IN: If user speaks while Loki is talking, immediately cut Loki off!
-        stopLokiVoice();
-        setIsLokiSpeakingState(false);
+        if (!isCallActiveRef.current || isLokiTalkingRef.current) return;
 
         let interim = "";
         let final = "";
@@ -146,40 +141,36 @@ export default function GeminiLiveModal({
           setLiveTranscript(currentSpeech);
           latestSpeechRef.current = currentSpeech;
 
-          // Natural conversational pause detection (1.1s silence = user finished talking)
+          // Natural conversational pause detection (900ms silence = user finished talking)
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
             const textToProcess = latestSpeechRef.current.trim();
-            if (textToProcess && isCallActiveRef.current) {
+            if (textToProcess && isCallActiveRef.current && !isLokiTalkingRef.current) {
               handleUserSpokeInCall(textToProcess);
               latestSpeechRef.current = "";
             }
-          }, 1100);
+          }, 900);
         }
       };
 
-      // PERPETUAL PHONE LOOP: If Android kills mic momentarily, instantly restart it!
       rec.onend = () => {
-        if (isCallActiveRef.current && !isMuted) {
-          try {
-            rec.start();
-          } catch {
-            setTimeout(() => {
-              if (isCallActiveRef.current && !isMuted) {
-                try { rec.start(); } catch {}
-              }
-            }, 300);
-          }
+        // Only restart if call is still active and Loki is not talking
+        if (isCallActiveRef.current && !isMuted && !isLokiTalkingRef.current) {
+          setTimeout(() => {
+            if (isCallActiveRef.current && !isMuted && !isLokiTalkingRef.current) {
+              try { rec.start(); } catch {}
+            }
+          }, 200);
         }
       };
 
       rec.onerror = (e) => {
-        if (isCallActiveRef.current && !isMuted) {
+        if (isCallActiveRef.current && !isMuted && !isLokiTalkingRef.current) {
           setTimeout(() => {
-            if (isCallActiveRef.current) {
+            if (isCallActiveRef.current && !isMuted && !isLokiTalkingRef.current) {
               try { rec.start(); } catch {}
             }
-          }, 400);
+          }, 300);
         }
       };
 
@@ -194,6 +185,10 @@ export default function GeminiLiveModal({
   const handleUserSpokeInCall = async (userText) => {
     if (!userText || !isCallActiveRef.current) return;
 
+    // Immediately stop mic so user's phone speaker won't loop into the mic
+    stopMicSafely();
+    setLiveTranscript("");
+
     try {
       const data = await askLoki({
         message: userText,
@@ -203,9 +198,8 @@ export default function GeminiLiveModal({
 
       if (!isCallActiveRef.current) return;
 
-      const reply = data.reply || "سامعك يا صاحبي ومتابع معاك.. كمل أنا في ضهرك.";
+      const reply = data.reply || "سامعك يا صاحبي ومركز معاك.. كمل أنا في ضهرك.";
       setLastLokiReply(reply);
-      setLiveTranscript("");
 
       // Pass message to main chat history
       onSendMessage(userText, reply, data.suggestions);
@@ -214,29 +208,58 @@ export default function GeminiLiveModal({
       speakLoki(reply);
     } catch (err) {
       if (isCallActiveRef.current) {
-        const fallback = "معاك يا غالي وسامعك كويس.. كمل كلامك.";
+        const fallback = "معاك وسامعك يا غالي، كمل كلامك أنا سامعك.";
         setLastLokiReply(fallback);
         speakLoki(fallback);
       }
     }
   };
 
-  // Loki Speak with animated visual state
+  // Loki Speak: Stops mic while speaking, and restarts mic immediately on finish
   const speakLoki = (text) => {
     if (!isCallActiveRef.current) return;
 
+    // 1. Mute mic hardware cleanly while Loki is talking
+    stopMicSafely();
+    isLokiTalkingRef.current = true;
     setIsLokiSpeakingState(true);
+
     playLokiVoice(text, {
       onStart: () => {
-        if (isCallActiveRef.current) setIsLokiSpeakingState(true);
+        if (isCallActiveRef.current) {
+          isLokiTalkingRef.current = true;
+          setIsLokiSpeakingState(true);
+        }
       },
       onEnd: () => {
-        if (isCallActiveRef.current) setIsLokiSpeakingState(false);
+        if (isCallActiveRef.current) {
+          isLokiTalkingRef.current = false;
+          setIsLokiSpeakingState(false);
+          // 2. Restart mic smoothly the instant Loki finishes
+          setTimeout(() => {
+            if (isCallActiveRef.current && !isLokiTalkingRef.current) {
+              startContinuousMic();
+            }
+          }, 150);
+        }
       },
       onError: () => {
-        if (isCallActiveRef.current) setIsLokiSpeakingState(false);
+        if (isCallActiveRef.current) {
+          isLokiTalkingRef.current = false;
+          setIsLokiSpeakingState(false);
+          startContinuousMic();
+        }
       },
     });
+  };
+
+  // User Interrupt: Tapping to interrupt Loki
+  const handleUserInterrupt = () => {
+    if (!isCallActiveRef.current) return;
+    stopLokiVoice();
+    isLokiTalkingRef.current = false;
+    setIsLokiSpeakingState(false);
+    startContinuousMic();
   };
 
   // Toggle Mute
@@ -246,16 +269,11 @@ export default function GeminiLiveModal({
       startContinuousMic();
     } else {
       setIsMuted(true);
-      if (recognitionRef.current) {
-        try {
-          recognitionRef.current.onend = null;
-          recognitionRef.current.abort();
-        } catch {}
-      }
+      stopMicSafely();
     }
   };
 
-  // Manual text send (if user prefers typing in noisy environment)
+  // Manual text send
   const handleSendManual = (e) => {
     e?.preventDefault();
     if (!manualText.trim()) return;
@@ -282,7 +300,7 @@ export default function GeminiLiveModal({
       <div className="flex flex-col items-center pt-2 sm:pt-4 text-center z-10 space-y-1">
         <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold shadow-sm">
           <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-          <span>مكالمة لايف مشفرة 🔒</span>
+          <span>مكالمة هاتفية لايف 🔒</span>
         </div>
 
         <h2 className="text-xl sm:text-2xl font-black text-white mt-1">لوكي (Loki) 💚</h2>
@@ -321,12 +339,21 @@ export default function GeminiLiveModal({
           </div>
         </div>
 
-        {/* Live Call Dynamic Status Text */}
+        {/* Live Call Dynamic Status & User Interruption Button */}
         <div className="mt-5 text-center px-4 max-w-xs sm:max-w-md">
           {isLokiSpeakingState ? (
-            <div className="flex items-center justify-center gap-2 text-emerald-300 font-bold text-sm sm:text-base animate-pulse">
-              <Volume2 className="w-5 h-5 text-emerald-400" />
-              <span>لوكي بيتكلم معاك دلوقتي...</span>
+            <div className="flex flex-col items-center gap-2">
+              <div className="flex items-center justify-center gap-2 text-emerald-300 font-bold text-sm sm:text-base animate-pulse">
+                <Volume2 className="w-5 h-5 text-emerald-400" />
+                <span>لوكي بيتكلم معاك دلوقتي...</span>
+              </div>
+              <button
+                onClick={handleUserInterrupt}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 text-amber-300 text-xs font-bold transition active:scale-95 shadow-sm"
+              >
+                <Hand className="w-3.5 h-3.5" />
+                <span>اضغط للمقاطعة والكلام ✋</span>
+              </button>
             </div>
           ) : liveTranscript ? (
             <div className="flex items-center justify-center gap-2 text-teal-300 font-medium text-xs sm:text-sm">
@@ -334,13 +361,14 @@ export default function GeminiLiveModal({
               <span className="truncate">سامعك: "{liveTranscript}"</span>
             </div>
           ) : (
-            <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed">
-              تكلم براحتك.. المايك مفتوح والخط شغال زي مكالمة الفون بالظبط.
-            </p>
+            <div className="flex items-center justify-center gap-2 text-emerald-400/90 text-xs sm:text-sm font-medium">
+              <Mic className="w-4 h-4 animate-pulse" />
+              <span>المايك مفتوح.. اتكلم ولوكي سامعك زي الفون</span>
+            </div>
           )}
         </div>
 
-        {/* Real-time Subtitles Bubble (if enabled) */}
+        {/* Real-time Subtitles Bubble */}
         {showSubtitles && lastLokiReply && (
           <div className="mt-4 px-4 py-2.5 max-w-sm rounded-2xl bg-[#0e1a24]/90 border border-emerald-500/20 text-xs text-slate-200 text-center shadow-lg animate-fade-in">
             <span className="text-emerald-400 font-bold ml-1">لوكي:</span>
@@ -348,7 +376,7 @@ export default function GeminiLiveModal({
           </div>
         )}
 
-        {/* Keyboard Input Overlay (Optional for noisy places) */}
+        {/* Keyboard Input Overlay */}
         {showKeyboardInput && (
           <form
             onSubmit={handleSendManual}
@@ -372,9 +400,9 @@ export default function GeminiLiveModal({
         )}
       </div>
 
-      {/* 3. Bottom Phone Call Controls (True Phone UI) */}
+      {/* 3. Bottom Phone Call Controls */}
       <div className="flex flex-col items-center pb-4 z-10 space-y-4">
-        {/* Secondary Utilities Row (Mute, Subtitles, Keyboard) */}
+        {/* Secondary Utilities Row */}
         <div className="flex items-center gap-4">
           {/* Mute Toggle */}
           <button
