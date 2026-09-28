@@ -1,48 +1,31 @@
-// Loki Audio Engine - Bulletproof Voice Playback for Android APK & Web
-// Combines Google Translate Natural Audio Streaming with Android Native SpeechSynthesis
+// Loki Audio Engine - Authentic Egyptian Young Man Voice
+// Replaces robotic female TTS with Natural Male Egyptian Voice (Pitch 0.84, Warm Tone)
 
 let currentAudio = null;
 let isAudioPlaying = false;
 let activeCallbacks = null;
 
-// Clean text for speech
+// Clean text for speech output
 export function cleanTextForSpeech(text) {
   if (!text) return "";
   return text
+    // Remove internal markers
     .replace(/<<<[\s\S]*?>>>/g, "")
+    // Remove markdown symbols
     .replace(/[*_#`~>\[\]\(\)\{\}\-]/g, " ")
+    // Remove emojis that cause speech engines to read "وجه مبتسم"
+    .replace(
+      /[\u{1F600}-\u{1F64F}\u{1F300}-\u{1F5FF}\u{1F680}-\u{1F6FF}\u{1F700}-\u{1F77F}\u{1F780}-\u{1F7FF}\u{1F800}-\u{1F8FF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}\u{1FA70}-\u{1FAFF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}]/gu,
+      ""
+    )
+    // Remove URLs
     .replace(/https?:\/\/\S+/g, "")
+    // Remove extra whitespace
     .replace(/\s+/g, " ")
     .trim();
 }
 
-// Split into short sentences for natural pacing (max ~120 chars)
-export function splitTextIntoChunks(text, maxLen = 120) {
-  const clean = cleanTextForSpeech(text);
-  if (!clean) return [];
-
-  const rawParts = clean.split(/([.،!؟\n\r]+)/);
-  const chunks = [];
-  let buffer = "";
-
-  for (let i = 0; i < rawParts.length; i++) {
-    const part = rawParts[i];
-    if (!part) continue;
-
-    if (buffer.length + part.length <= maxLen) {
-      buffer += part;
-    } else {
-      if (buffer.trim()) chunks.push(buffer.trim());
-      buffer = part;
-    }
-  }
-
-  if (buffer.trim()) chunks.push(buffer.trim());
-
-  return chunks.filter((c) => c.trim().length > 0);
-}
-
-// Stop any current speech
+// Stop any current voice playback
 export function stopLokiVoice() {
   isAudioPlaying = false;
 
@@ -69,8 +52,72 @@ export function stopLokiVoice() {
   activeCallbacks = null;
 }
 
-// Play via Native SpeechSynthesis (Built-in to Android Google TTS)
-function playViaSpeechSynthesis(cleanText, callbacks) {
+// Find best natural MALE Arabic voice on the device
+function getBestMaleArabicVoice() {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return null;
+
+  const voices = window.speechSynthesis.getVoices() || [];
+  if (voices.length === 0) return null;
+
+  const arabicVoices = voices.filter((v) => {
+    const lang = (v.lang || "").toLowerCase();
+    const name = (v.name || "").toLowerCase();
+    return lang.startsWith("ar") || name.includes("arabic") || name.includes("عربي");
+  });
+
+  if (arabicVoices.length === 0) return null;
+
+  // 1. Explicit Male Egyptian / Arabic Voices
+  const maleVoice = arabicVoices.find((v) => {
+    const n = v.name.toLowerCase();
+    return (
+      n.includes("male") ||
+      n.includes("shakir") ||
+      n.includes("tariq") ||
+      n.includes("maged") ||
+      n.includes("hamed") ||
+      n.includes("naayf") ||
+      n.includes("george") ||
+      n.includes("-b") ||
+      n.includes("-c") ||
+      n.includes("wavenet-b") ||
+      n.includes("standard-b") ||
+      n.includes("standard-c") ||
+      n.includes("m-local")
+    );
+  });
+
+  if (maleVoice) return maleVoice;
+
+  // 2. Reject known female voices
+  const nonFemaleVoice = arabicVoices.find((v) => {
+    const n = v.name.toLowerCase();
+    return !(
+      n.includes("female") ||
+      n.includes("salma") ||
+      n.includes("zari") ||
+      n.includes("laila") ||
+      n.includes("zeina") ||
+      n.includes("hoda") ||
+      n.includes("-a") ||
+      n.includes("-d") ||
+      n.includes("f-local")
+    );
+  });
+
+  return nonFemaleVoice || arabicVoices[0];
+}
+
+// Play Natural Male Egyptian Voice via SpeechSynthesis
+export function playLokiVoice(text, callbacks = {}) {
+  stopLokiVoice();
+
+  const clean = cleanTextForSpeech(text);
+  if (!clean) {
+    callbacks?.onEnd?.();
+    return;
+  }
+
   if (typeof window === "undefined" || !("speechSynthesis" in window)) {
     callbacks?.onEnd?.();
     return;
@@ -78,28 +125,26 @@ function playViaSpeechSynthesis(cleanText, callbacks) {
 
   try {
     window.speechSynthesis.cancel();
-
-    // Android WebView fix: resume speech synthesis if paused
     if (window.speechSynthesis.paused) {
       window.speechSynthesis.resume();
     }
 
-    const utterance = new SpeechSynthesisUtterance(cleanText);
-    utterance.lang = "ar"; // Matches ar-EG, ar-SA, ar-XA on Android!
-    utterance.rate = 1.0;
-    utterance.pitch = 1.0;
+    const utterance = new SpeechSynthesisUtterance(clean);
 
-    // Pick best Arabic voice if available
-    const voices = window.speechSynthesis.getVoices() || [];
-    const arabicVoice =
-      voices.find((v) => v.lang && v.lang.toLowerCase().startsWith("ar")) ||
-      voices.find((v) => v.name && v.name.toLowerCase().includes("ar")) ||
-      null;
+    // Warm, Youthful Egyptian Male Pitch (0.83 gives a distinct baritone male resonance)
+    utterance.pitch = 0.83;
+    // Conversational, lively pace (1.08 prevents the slow robotic drawl)
+    utterance.rate = 1.06;
+    utterance.lang = "ar-EG";
 
-    if (arabicVoice) {
-      utterance.voice = arabicVoice;
-      utterance.lang = arabicVoice.lang;
+    const maleVoice = getBestMaleArabicVoice();
+    if (maleVoice) {
+      utterance.voice = maleVoice;
+      utterance.lang = maleVoice.lang || "ar-EG";
     }
+
+    isAudioPlaying = true;
+    activeCallbacks = callbacks;
 
     utterance.onstart = () => {
       isAudioPlaying = true;
@@ -111,89 +156,18 @@ function playViaSpeechSynthesis(cleanText, callbacks) {
       callbacks?.onEnd?.();
     };
 
-    utterance.onerror = () => {
+    utterance.onerror = (e) => {
+      console.warn("Speech synthesis notice:", e);
       isAudioPlaying = false;
       callbacks?.onEnd?.();
     };
 
     window.speechSynthesis.speak(utterance);
   } catch (err) {
+    console.error("Male voice synthesis error:", err);
     isAudioPlaying = false;
     callbacks?.onEnd?.();
   }
-}
-
-// Main Play Function
-export function playLokiVoice(text, callbacks = {}) {
-  stopLokiVoice();
-
-  const clean = cleanTextForSpeech(text);
-  if (!clean) {
-    callbacks?.onEnd?.();
-    return;
-  }
-
-  isAudioPlaying = true;
-  activeCallbacks = callbacks;
-  callbacks.onStart?.();
-
-  const chunks = splitTextIntoChunks(clean);
-  if (chunks.length === 0) {
-    stopLokiVoice();
-    return;
-  }
-
-  let chunkIndex = 0;
-
-  const playChunk = () => {
-    if (!isAudioPlaying) return;
-
-    if (chunkIndex >= chunks.length) {
-      stopLokiVoice();
-      return;
-    }
-
-    const chunk = chunks[chunkIndex];
-    chunkIndex++;
-
-    // NOTE: DO NOT set crossOrigin = "anonymous" because Google Translate TTS does not include CORS headers!
-    // Standard HTML5 Audio elements can play cross-origin audio streams freely without CORS.
-    const ttsUrl = `https://translate.google.com/translate_tts?ie=UTF-8&tl=ar&client=tw-ob&q=${encodeURIComponent(
-      chunk
-    )}`;
-
-    const audio = new Audio();
-    currentAudio = audio;
-    audio.src = ttsUrl;
-
-    const playPromise = audio.play();
-
-    if (playPromise !== undefined) {
-      playPromise
-        .then(() => {
-          audio.onended = () => {
-            playChunk();
-          };
-          audio.onerror = () => {
-            // Fallback to native Android SpeechSynthesis
-            playViaSpeechSynthesis(clean, callbacks);
-          };
-        })
-        .catch(() => {
-          // In case of autoplay policy restriction or network error, fallback to SpeechSynthesis
-          playViaSpeechSynthesis(clean, callbacks);
-        });
-    } else {
-      audio.onended = () => {
-        playChunk();
-      };
-      audio.onerror = () => {
-        playViaSpeechSynthesis(clean, callbacks);
-      };
-    }
-  };
-
-  playChunk();
 }
 
 export function isLokiSpeaking() {
