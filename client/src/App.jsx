@@ -12,13 +12,13 @@ import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./components/LandingPage";
 
 export default function App() {
-  // Routing: Landing Page vs Chat View vs Admin Dashboard
+  // Routing: Companion Chat vs Admin Dashboard vs Landing
   const [currentView, setCurrentView] = useState(() => {
     const path = window.location.pathname;
     const hash = window.location.hash;
     if (path.startsWith("/admin") || hash === "#admin") return "admin";
-    if (path.startsWith("/chat") || hash === "#chat") return "chat";
-    return "landing";
+    if (path.startsWith("/landing") || hash === "#landing") return "landing";
+    return "chat";
   });
 
   // User Profile
@@ -377,7 +377,36 @@ export default function App() {
         onNewChat={handleNewChat}
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenBreathing={() => setIsBreathingOpen(true)}
+        onOpenAdmin={openAdminDashboard}
       />
+
+      {/* Stitch Emotional Sanctuary Sub-Bar */}
+      <div className="flex items-center justify-between px-3 sm:px-6 py-2 bg-[#1c1b1c]/80 border-b border-white/5 backdrop-blur-md text-xs z-10">
+        <div className="flex items-center gap-2">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#38bdf8] opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#38bdf8]" />
+          </span>
+          <span className="text-[11px] text-slate-300">مساحتك الآمنة مشفرة بالكامل 🌿</span>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <a
+            href="/downloads/loki.apk"
+            download="loki-ai-companion.apk"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-[11px] font-bold border border-emerald-500/30 transition active:scale-95"
+            title="تحميل تطبيق الأندرويد"
+          >
+            <span>تحميل APK</span>
+          </a>
+          <button
+            onClick={openAdminDashboard}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-[11px] font-semibold border border-purple-500/30 transition active:scale-95"
+          >
+            <span>لوحة الأدمن</span>
+          </button>
+        </div>
+      </div>
 
       {/* Mood Selector Dropdown */}
       {showMoodBar && (
@@ -393,7 +422,48 @@ export default function App() {
       )}
 
       {/* Messages Scroll Area */}
-      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-2 max-w-3xl w-full mx-auto">
+      <main className="flex-1 overflow-y-auto px-4 sm:px-6 py-4 space-y-3 max-w-3xl w-full mx-auto">
+        {/* Stitch Psychological Welcoming Sanctuary Card */}
+        <div className="relative overflow-hidden bg-gradient-to-b from-[#2a2a2b]/95 to-[#201f20]/90 rounded-3xl p-4 sm:p-6 border border-white/10 shadow-xl my-2 animate-fade-in">
+          <div className="absolute -top-12 -left-12 w-36 h-36 bg-[#38bdf8]/15 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-8 -right-8 w-32 h-32 bg-[#a855f7]/15 rounded-full blur-xl pointer-events-none" />
+
+          <div className="flex items-start gap-3.5 relative z-10">
+            <div className="w-13 h-13 rounded-2xl overflow-hidden p-0.5 bg-gradient-to-tr from-[#38bdf8] via-[#a855f7] to-[#ec4899] shrink-0 shadow-lg">
+              <img src="/loki_hero.jpg" alt="Loki" className="w-full h-full object-cover rounded-2xl" />
+            </div>
+
+            <div className="flex-1 min-w-0 text-right">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center justify-end gap-1.5">
+                <span>{userProfile?.name ? `مساء الخير يا ${userProfile.name} يا غالي..` : "مساء الخير يا صاحبي.."}</span>
+                <span className="text-lg">👋</span>
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-300 mt-1 leading-relaxed">
+                عامل إيه النهاردة؟ حاسس بضغط ومحتاج ترتب أفكارك، ولا حابب نفضفض مع بعض بهدوء؟
+              </p>
+
+              {/* Quick Sentiment Selector Chips (from Stitch UI) */}
+              <div className="mt-3.5 flex flex-wrap gap-1.5 justify-end">
+                {[
+                  { label: "مرتاح", emoji: "😊", msg: "الحمد لله حاسس بروقان وراحة النهاردة" },
+                  { label: "متوتر ومضغوط", emoji: "😣", msg: "مضغوط شوية ومتوتر من الشغل واليوم" },
+                  { label: "محتار وتعبان", emoji: "🤔", msg: "محتار في كذا حاجة وتعبت من التفكير" },
+                  { label: "محتاج هدوء", emoji: "🌿", msg: "محتاج هدوء ونفس عميق ومش عايز دوشة" },
+                  { label: "فرحان", emoji: "🚀", msg: "مبسوط وفرحان الحمد لله وحبيت أشاركك" },
+                ].map((item, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSendMessage(item.msg)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#353436] hover:bg-[#39393a] text-xs text-slate-200 hover:text-white border border-white/5 active:scale-95 transition-all shadow-sm"
+                  >
+                    <span>{item.emoji}</span>
+                    <span>{item.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
         {messages.map((msg, index) => (
           <AndroidChatMessage
             key={msg.id || index}
