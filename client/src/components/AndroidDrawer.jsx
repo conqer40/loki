@@ -9,6 +9,7 @@ export default function AndroidDrawer({
   userProfile,
   onOpenOnboarding,
   onOpenAdmin,
+  onOpenLanding,
 }) {
   return (
     <>
