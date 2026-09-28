@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Mic, MicOff, X, Keyboard, Sparkles, Volume2 } from "lucide-react";
+import { askLoki } from "../services/lokiBrain";
+import { playLokiVoice, stopLokiVoice } from "../services/lokiAudio";
 
 export default function GeminiLiveModal({
   isOpen,
@@ -54,6 +56,7 @@ export default function GeminiLiveModal({
   };
 
   const stopAudio = () => {
+    stopLokiVoice();
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -135,21 +138,13 @@ export default function GeminiLiveModal({
     setLiveTranscript(spokenText);
 
     try {
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: spokenText,
-          userMood: currentMood,
-          apiKey,
-          groqApiKey,
-          provider: groqApiKey ? "groq" : provider,
-        }),
+      const data = await askLoki({
+        message: spokenText,
+        userMood: currentMood,
+        apiKey,
       });
 
-      const data = await res.json();
       const reply = data.reply || "معاك وسامعك يا صاحبي.. كمل أنا في ضهرك.";
-
       setLokiReplyText(reply);
       onSendMessage(spokenText, reply, data.suggestions);
 
@@ -164,37 +159,21 @@ export default function GeminiLiveModal({
     isSpeakingRef.current = true;
     setCallState("speaking");
 
-    try {
-      const res = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice, apiKey }),
-      });
-
-      if (!res.ok) throw new Error("TTS failed");
-
-      const blob = await res.blob();
-      const audioUrl = URL.createObjectURL(blob);
-
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        await audioRef.current.play();
-
-        audioRef.current.onended = () => {
-          isSpeakingRef.current = false;
-          setCallState("listening");
-          setLiveTranscript("");
-        };
-
-        audioRef.current.onpause = () => {
-          isSpeakingRef.current = false;
-        };
-      }
-    } catch (err) {
-      console.warn("TTS error in Live call:", err);
-      isSpeakingRef.current = false;
-      setCallState("listening");
-    }
+    playLokiVoice(text, {
+      onStart: () => {
+        isSpeakingRef.current = true;
+        setCallState("speaking");
+      },
+      onEnd: () => {
+        isSpeakingRef.current = false;
+        setCallState("listening");
+        setLiveTranscript("");
+      },
+      onError: () => {
+        isSpeakingRef.current = false;
+        setCallState("listening");
+      },
+    });
   };
 
   const toggleMute = () => {

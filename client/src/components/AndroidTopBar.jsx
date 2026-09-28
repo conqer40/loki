@@ -1,5 +1,5 @@
 import React from "react";
-import { Menu, Plus, Sparkles, Wind, Settings, Download, Lock } from "lucide-react";
+import { Menu, Plus, Sparkles, Wind, Settings, Download, Lock, PhoneCall } from "lucide-react";
 
 export default function AndroidTopBar({
   onOpenDrawer,
@@ -7,67 +7,51 @@ export default function AndroidTopBar({
   onOpenSettings,
   onOpenBreathing,
   onOpenAdmin,
+  onOpenLiveVoice,
   isNativeApp = false,
 }) {
   return (
-    <header className="flex items-center justify-between px-3 sm:px-5 py-2.5 bg-[#131314]/90 backdrop-blur-md border-b border-white/5 z-20 select-none">
+    <header className="flex items-center justify-between px-3 sm:px-5 py-2.5 bg-[#0d1622]/95 backdrop-blur-md border-b border-emerald-500/20 z-20 select-none shadow-md">
       {/* Right side: Drawer Toggle + Loki Brand */}
       <div className="flex items-center gap-2.5">
         <button
           onClick={onOpenDrawer}
-          className="p-2 rounded-full hover:bg-white/10 text-slate-300 hover:text-white transition active:scale-95"
+          className="p-2 rounded-full hover:bg-white/10 text-emerald-300 hover:text-white transition active:scale-95"
           title="القائمة والمحادثات"
         >
           <Menu className="w-5 h-5" />
         </button>
 
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-full overflow-hidden p-0.5 bg-gradient-to-tr from-[#38bdf8] via-[#a855f7] to-[#ec4899] shadow-sm">
+        <div className="flex items-center gap-2 cursor-pointer" onClick={onNewChat}>
+          <div className="relative w-8 h-8 rounded-full overflow-hidden p-0.5 bg-gradient-to-tr from-emerald-400 via-teal-300 to-cyan-400 shadow-sm">
             <img src="/loki_hero.jpg" alt="Loki" className="w-full h-full object-cover rounded-full" />
+            <span className="absolute bottom-0 right-0 w-2 h-2 rounded-full bg-emerald-400 border border-black" />
           </div>
           <div className="hidden xs:flex flex-col text-right">
-            <span className="text-sm font-bold text-white tracking-wide">لوكي</span>
-            <span className="text-[9px] text-[#8ed5ff]">رفيقك النفسي</span>
+            <span className="text-sm font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200">
+              لوكي 💚
+            </span>
+            <span className="text-[9px] text-emerald-400/80 font-medium">رفيقك الذكي</span>
           </div>
         </div>
       </div>
 
-      {/* Center: Gemini 3.5 Model Status Pill */}
-      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#1e1f20] border border-white/10 text-xs font-semibold text-slate-200 shadow-sm">
-        <Sparkles className="w-3.5 h-3.5 text-[#38bdf8] animate-pulse" />
-        <span className="text-[11px] text-transparent bg-clip-text bg-gradient-to-r from-[#8ed5ff] to-[#ddb7ff]">
-          Gemini 3.5 Flash
-        </span>
-      </div>
+      {/* Center: Live Call Direct Button (Prominent & Cheerful) */}
+      <button
+        onClick={onOpenLiveVoice}
+        className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs shadow-lg shadow-emerald-950/50 border border-emerald-400/30 transition active:scale-95 animate-pulse"
+        title="بدء مكالمة صوتية لايف مباشرة مع لوكي"
+      >
+        <PhoneCall className="w-3.5 h-3.5" />
+        <span>مكالمة صوتية لايف 🎙️</span>
+      </button>
 
-      {/* Left Actions: APK Download + Admin + Breathing + New Chat */}
+      {/* Left Actions: New Chat + Breathing + Settings */}
       <div className="flex items-center gap-1 sm:gap-1.5">
-        {/* Direct APK Download Button (Visible only on web) */}
-        {!isNativeApp && (
-          <a
-            href="/downloads/loki.apk"
-            download="loki-ai-companion.apk"
-            className="hidden sm:flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-[11px] font-bold text-emerald-300 transition active:scale-95 shadow-sm"
-            title="تحميل تطبيق الأندرويد APK"
-          >
-            <Download className="w-3 h-3 text-emerald-400" />
-            <span>تحميل APK</span>
-          </a>
-        )}
-
-        {/* Admin Dashboard Entry */}
-        <button
-          onClick={onOpenAdmin}
-          className="p-2 rounded-full hover:bg-purple-900/30 text-purple-300 hover:text-white transition active:scale-95"
-          title="دخول لوحة تحكم الأدمن"
-        >
-          <Lock className="w-4 h-4 text-purple-400" />
-        </button>
-
         {/* Breathing Exercise */}
         <button
           onClick={onOpenBreathing}
-          className="p-2 rounded-full hover:bg-white/10 text-primary-container hover:text-white transition active:scale-95 text-[#38bdf8]"
+          className="p-2 rounded-full hover:bg-emerald-500/15 text-emerald-400 hover:text-white transition active:scale-95"
           title="جلسة تنفس واسترخاء"
         >
           <Wind className="w-4 h-4" />

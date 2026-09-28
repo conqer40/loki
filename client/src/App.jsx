@@ -11,7 +11,9 @@ import MoodSelector from "./components/MoodSelector";
 import UserOnboardingModal from "./components/UserOnboardingModal";
 import AdminDashboard from "./components/AdminDashboard";
 import LandingPage from "./components/LandingPage";
+import WelcomeChoiceModal from "./components/WelcomeChoiceModal";
 import { askLoki } from "./services/lokiBrain";
+import { playLokiVoice, stopLokiVoice } from "./services/lokiAudio";
 
 export default function App() {
   // Detect if running inside native Android App (Capacitor or WebView)
@@ -98,6 +100,7 @@ export default function App() {
   const [autoSpeak, setAutoSpeak] = useState(() => localStorage.getItem("loki_autospeak") !== "false");
 
   // Modals & Navigation
+  const [showWelcomeChoice, setShowWelcomeChoice] = useState(true);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLiveVoiceOpen, setIsLiveVoiceOpen] = useState(false);
   const [isBreathingOpen, setIsBreathingOpen] = useState(false);
@@ -240,8 +243,8 @@ export default function App() {
     }
   };
 
-  // Play Loki Warm Voice directly
-  const speakMessage = async (text, messageId) => {
+  // Play Loki Warm Voice directly using robust lokiAudio service
+  const speakMessage = (text, messageId) => {
     if (!text) return;
 
     if (isPlayingAudio && currentPlayingId === messageId) {
@@ -253,54 +256,24 @@ export default function App() {
     setIsPlayingAudio(true);
     setCurrentPlayingId(messageId);
 
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
-
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, voice, apiKey }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (!response.ok) throw new Error("TTS failed");
-
-      const blob = await response.blob();
-      const audioUrl = URL.createObjectURL(blob);
-
-      if (audioRef.current) {
-        audioRef.current.src = audioUrl;
-        await audioRef.current.play();
-
-        audioRef.current.onended = () => {
-          setIsPlayingAudio(false);
-          setCurrentPlayingId(null);
-        };
-        audioRef.current.onpause = () => {
-          setIsPlayingAudio(false);
-          setCurrentPlayingId(null);
-        };
-        audioRef.current.onerror = () => {
-          fallbackSpeech(text, messageId);
-        };
-      }
-    } catch {
-      fallbackSpeech(text, messageId);
-    }
+    playLokiVoice(text, {
+      onStart: () => {
+        setIsPlayingAudio(true);
+        setCurrentPlayingId(messageId);
+      },
+      onEnd: () => {
+        setIsPlayingAudio(false);
+        setCurrentPlayingId(null);
+      },
+      onError: () => {
+        setIsPlayingAudio(false);
+        setCurrentPlayingId(null);
+      },
+    });
   };
 
   const stopAudio = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-    }
-    if (typeof window !== "undefined" && "speechSynthesis" in window) {
-      try {
-        window.speechSynthesis.cancel();
-      } catch {}
-    }
+    stopLokiVoice();
     setIsPlayingAudio(false);
     setCurrentPlayingId(null);
   };
@@ -425,6 +398,8 @@ export default function App() {
     stopAudio();
     setMessages([getInitialWelcome(userProfile?.name)]);
     localStorage.removeItem("loki_chat_history");
+    setShowWelcomeChoice(true);
+    setIsDrawerOpen(false);
   };
 
   // Render Admin Dashboard
@@ -438,8 +413,12 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#131314] text-[#e3e3e3] overflow-hidden relative font-sans">
+    <div className="flex flex-col h-screen w-full bg-gradient-to-b from-[#0a1219] via-[#0d1722] to-[#070b0f] text-[#f1f5f9] overflow-hidden relative font-sans">
       <audio ref={audioRef} className="hidden" />
+
+      {/* Cheerful Ambient Backdrops */}
+      <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-20 left-0 w-80 h-80 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
       {/* Top Bar */}
       <AndroidTopBar
@@ -448,17 +427,21 @@ export default function App() {
         onOpenSettings={() => setIsSettingsOpen(true)}
         onOpenBreathing={() => setIsBreathingOpen(true)}
         onOpenAdmin={openAdminDashboard}
+        onOpenLiveVoice={() => {
+          stopAudio();
+          setIsLiveVoiceOpen(true);
+        }}
         isNativeApp={isNativeApp}
       />
 
-      {/* Stitch Emotional Sanctuary Sub-Bar */}
-      <div className="flex items-center justify-between px-3 sm:px-6 py-2 bg-[#1c1b1c]/80 border-b border-white/5 backdrop-blur-md text-xs z-10">
+      {/* Cheerful Emotional Sanctuary Sub-Bar */}
+      <div className="flex items-center justify-between px-3 sm:px-6 py-2 bg-[#0e1722]/85 border-b border-emerald-500/15 backdrop-blur-md text-xs z-10">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#38bdf8] opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#38bdf8]" />
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400" />
           </span>
-          <span className="text-[11px] text-slate-300">مساحتك الآمنة مشفرة بالكامل 🌿</span>
+          <span className="text-[11px] font-bold text-emerald-300">مساحتك الآمنة مع لوكي مشفرة بالكامل 🌿</span>
         </div>
 
         {!isNativeApp && (
@@ -584,6 +567,22 @@ export default function App() {
         onToggleMood={() => setShowMoodBar(!showMoodBar)}
         attachedImage={attachedImage}
         setAttachedImage={setAttachedImage}
+      />
+
+      {/* Welcome Choice Modal: Interactive Choice on Launch */}
+      <WelcomeChoiceModal
+        isOpen={showWelcomeChoice}
+        onStartCall={() => {
+          setShowWelcomeChoice(false);
+          stopAudio();
+          setIsLiveVoiceOpen(true);
+        }}
+        onStartChat={() => {
+          setShowWelcomeChoice(false);
+        }}
+        currentMood={currentMood}
+        onChangeMood={setCurrentMood}
+        onClose={() => setShowWelcomeChoice(false)}
       />
 
       {/* Navigation Drawer */}

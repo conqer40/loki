@@ -1,5 +1,5 @@
 import React from "react";
-import { MessageSquare, Mic, Wind, User, Settings } from "lucide-react";
+import { MessageSquare, PhoneCall, Wind, User, Settings } from "lucide-react";
 
 export default function AndroidBottomNav({
   activeTab = "chat",
@@ -11,7 +11,7 @@ export default function AndroidBottomNav({
 }) {
   return (
     <nav className="fixed bottom-3 inset-x-3 sm:max-w-md sm:mx-auto z-30 select-none">
-      <div className="bg-[#1e1f20]/90 backdrop-blur-2xl border border-white/10 rounded-full px-3 py-2 shadow-2xl flex items-center justify-around">
+      <div className="bg-[#0b141d]/90 backdrop-blur-2xl border border-emerald-500/25 rounded-full px-3 py-2 shadow-2xl shadow-black/70 flex items-center justify-around">
         {/* Chat / Companion */}
         <button
           onClick={() => onSelectTab("chat")}
@@ -25,19 +25,19 @@ export default function AndroidBottomNav({
           <span className="text-[10px]">فضفضة</span>
         </button>
 
-        {/* Live Voice Call - Highlighted Center Aurora Action */}
+        {/* Live Voice Call - Highlighted Center Cheerful Action */}
         <button
           onClick={onOpenLiveVoice}
           className="flex flex-col items-center -mt-5 transition-all active:scale-90 group"
-          title="مكالمة صوتية حية مع لوكي"
+          title="مكالمة صوتية حية مباشرة مع لوكي"
         >
-          <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-[#38bdf8] via-[#a855f7] to-[#ec4899] p-0.5 shadow-xl shadow-purple-900/50 group-hover:scale-105 transition-transform">
-            <div className="w-full h-full rounded-full bg-[#131314] flex items-center justify-center">
-              <Mic className="w-6 h-6 text-white group-hover:text-[#38bdf8] transition-colors animate-pulse" />
+          <div className="w-13 h-13 rounded-full bg-gradient-to-tr from-emerald-400 via-teal-400 to-cyan-400 p-0.5 shadow-xl shadow-emerald-950/80 group-hover:scale-105 transition-transform animate-pulse">
+            <div className="w-full h-full rounded-full bg-[#0a1118] flex items-center justify-center">
+              <PhoneCall className="w-6 h-6 text-emerald-400 group-hover:text-emerald-300 transition-colors" />
             </div>
           </div>
-          <span className="text-[10px] font-bold text-transparent bg-clip-text bg-gradient-to-r from-[#38bdf8] to-[#ec4899] mt-0.5">
-            مكالمة لايف
+          <span className="text-[10px] font-black text-transparent bg-clip-text bg-gradient-to-r from-emerald-300 to-teal-200 mt-0.5">
+            مكالمة لايف 🎙️
           </span>
         </button>
 

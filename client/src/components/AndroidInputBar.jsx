@@ -75,12 +75,12 @@ export default function AndroidInputBar({
 
         <div className="flex items-center gap-2">
           {/* Floating Capsule Input Pill */}
-          <div className="flex-1 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-[#1e1f20] border border-white/10 shadow-lg focus-within:border-[#a8c7fa]/50 transition-colors">
+          <div className="flex-1 flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 rounded-full bg-[#121c27] border border-emerald-500/30 shadow-lg focus-within:border-emerald-400 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
             {/* Mood / Extras toggle icon */}
             <button
               type="button"
               onClick={onToggleMood}
-              className="p-2 rounded-full hover:bg-white/10 text-slate-400 hover:text-purple-300 transition active:scale-95 shrink-0"
+              className="p-2 rounded-full hover:bg-white/10 text-emerald-400 hover:text-emerald-300 transition active:scale-95 shrink-0"
               title="حالتك المزاجية"
             >
               <Smile className="w-5 h-5" />
@@ -101,8 +101,8 @@ export default function AndroidInputBar({
               onClick={() => fileInputRef.current?.click()}
               className={`p-2 rounded-full transition active:scale-95 shrink-0 ${
                 attachedImage
-                  ? "bg-purple-600/30 text-purple-300"
-                  : "hover:bg-white/10 text-slate-400 hover:text-white"
+                  ? "bg-emerald-500/30 text-emerald-300"
+                  : "hover:bg-white/10 text-slate-400 hover:text-emerald-300"
               }`}
               title="إرفاق صورة أو رسمة أو مذكرة للوكي"
             >
@@ -122,7 +122,7 @@ export default function AndroidInputBar({
                   : "فضفض مع لوكي.. احكي أي حاجة في بالك..."
               }
               disabled={isLoading}
-              className="flex-1 py-2 px-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none"
+              className="flex-1 py-2 px-1 bg-transparent text-sm text-slate-100 placeholder:text-slate-400 focus:outline-none"
             />
 
             {/* Mic Button (Speech-to-Text) */}
@@ -132,7 +132,7 @@ export default function AndroidInputBar({
               className={`p-2 rounded-full transition active:scale-95 shrink-0 ${
                 isListening
                   ? "bg-rose-600 text-white animate-pulse"
-                  : "hover:bg-white/10 text-slate-400 hover:text-white"
+                  : "hover:bg-white/10 text-emerald-400 hover:text-emerald-300"
               }`}
               title={isListening ? "إيقاف الاستماع" : "إملاء صوتي"}
             >
@@ -145,21 +145,21 @@ export default function AndroidInputBar({
             <button
               type="submit"
               disabled={isLoading}
-              className="p-3.5 rounded-full bg-white text-black hover:bg-slate-200 transition active:scale-95 shadow-md flex items-center justify-center shrink-0"
+              className="p-3.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:opacity-95 transition active:scale-95 shadow-lg shadow-emerald-950/60 flex items-center justify-center shrink-0 border border-emerald-400/30"
               title="إرسال"
             >
               <Send className="w-4 h-4 transform rotate-180" />
             </button>
           ) : (
-            /* The Iconic Gemini Live / ChatGPT Voice Mode Button */
+            /* The Iconic Gemini Live Voice Mode Button */
             <button
               type="button"
               onClick={onOpenLiveVoice}
-              className="relative p-3.5 rounded-full bg-gradient-to-tr from-[#6366f1] via-[#8b5cf6] to-[#ec4899] text-white hover:opacity-90 transition active:scale-95 shadow-lg shadow-purple-950/60 flex items-center justify-center shrink-0 group"
-              title="مكالمة صوتية لايف مباشرة (Gemini Live)"
+              className="relative p-3.5 rounded-full bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-500 text-white hover:opacity-95 transition active:scale-95 shadow-xl shadow-emerald-950/70 flex items-center justify-center shrink-0 group border border-emerald-400/40"
+              title="مكالمة صوتية لايف مباشرة مع لوكي"
             >
-              <span className="absolute inset-0 rounded-full bg-gradient-to-tr from-[#38bdf8] via-[#a855f7] to-[#f43f5e] opacity-75 blur-xs animate-spin-slow pointer-events-none" />
-              <Radio className="w-5 h-5 relative z-10 animate-pulse" />
+              <span className="absolute inset-0 rounded-full bg-emerald-400 opacity-40 blur-xs animate-ping pointer-events-none" />
+              <Radio className="w-5 h-5 relative z-10 animate-pulse text-white" />
             </button>
           )}
         </div>

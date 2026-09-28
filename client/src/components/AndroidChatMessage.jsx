@@ -22,13 +22,13 @@ export default function AndroidChatMessage({
   };
 
   if (!isLoki) {
-    // User Message (Stitch UI: Rounded container aligned to start in RTL)
+    // User Message: Vibrant cheerful gradient bubble
     return (
       <div className="flex flex-col items-start self-start max-w-[88%] my-3 animate-fade-in">
-        <div className="bg-[#282a2c] text-[#e5e2e3] rounded-2xl rounded-tr-xs px-4 py-3 shadow-sm space-y-2 border border-white/5">
+        <div className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white rounded-2xl rounded-tr-xs px-4 py-3 shadow-lg shadow-emerald-950/40 space-y-2 border border-emerald-400/20">
           {/* User Attached Image (if any) */}
           {msg.image && (
-            <div className="rounded-xl overflow-hidden border border-white/10 max-w-xs bg-black/40">
+            <div className="rounded-xl overflow-hidden border border-white/20 max-w-xs bg-black/40">
               <img
                 src={msg.image}
                 alt="مرفق المستخدم"
@@ -39,69 +39,70 @@ export default function AndroidChatMessage({
           )}
 
           {msg.text && (
-            <p className="text-sm sm:text-base leading-relaxed text-right whitespace-pre-line font-normal">
+            <p className="text-sm sm:text-base leading-relaxed text-right whitespace-pre-line font-medium text-emerald-50">
               {msg.text}
             </p>
           )}
         </div>
-        <span className="text-[11px] text-slate-400 mt-1 px-1">
+        <span className="text-[11px] text-emerald-400/80 mt-1 px-1 font-medium">
           أنت • {msg.timestamp || "الآن"}
         </span>
       </div>
     );
   }
 
-  // Loki Assistant Message (Stitch UI: Pure Android Psychological Companion Card)
+  // Loki Assistant Message: Cheerful, warm and engaging companion card
   return (
     <div className="flex flex-col w-full my-4 animate-fade-in">
-      <div className="flex flex-col w-full bg-[#1e1f20]/90 border border-white/5 rounded-2xl p-4 sm:p-5 shadow-sm relative overflow-hidden">
-        {/* Subtle iridescent glow highlight in corner */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-[#38bdf8]/10 via-[#a855f7]/10 to-transparent rounded-full blur-xl pointer-events-none" />
+      <div className="flex flex-col w-full bg-gradient-to-b from-[#131e29]/95 via-[#101923]/95 to-[#0b121a]/95 border border-emerald-500/25 rounded-3xl p-4 sm:p-5 shadow-xl shadow-black/50 relative overflow-hidden">
+        {/* Cheerful iridescent glow in corner */}
+        <div className="absolute top-0 right-0 w-36 h-36 bg-gradient-to-br from-emerald-500/15 via-teal-500/10 to-transparent rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute bottom-0 left-0 w-28 h-28 bg-cyan-500/10 rounded-full blur-xl pointer-events-none" />
 
         {/* Companion Header Row */}
-        <div className="flex items-center justify-between mb-3 relative z-10">
+        <div className="flex items-center justify-between mb-3.5 relative z-10">
           <div className="flex items-center gap-2.5">
-            {/* Loki Hero Avatar */}
-            <div className="relative w-9 h-9 rounded-full overflow-hidden shadow-md p-0.5 bg-gradient-to-tr from-[#38bdf8] via-[#a855f7] to-[#ec4899] shrink-0">
+            {/* Loki Mascot Avatar with Glowing Ring */}
+            <div className="relative w-10 h-10 rounded-full overflow-hidden shadow-lg p-0.5 bg-gradient-to-tr from-emerald-400 via-teal-300 to-cyan-400 shrink-0">
               <img
                 src="/loki_hero.jpg"
                 alt="لوكي"
                 className="w-full h-full object-cover rounded-full"
               />
-              <span className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-[#38bdf8] rounded-full border border-[#1e1f20]" />
+              <span className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-[#101923]" />
             </div>
 
             <div className="flex flex-col text-right">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-transparent bg-clip-text bg-gradient-to-l from-[#8ed5ff] via-[#ddb7ff] to-[#ffb9d2]">
-                  لوكي | رفيقك النفسي
+                <span className="text-sm sm:text-base font-black text-transparent bg-clip-text bg-gradient-to-l from-emerald-300 via-teal-200 to-cyan-200">
+                  لوكي | صاحبك الذكي 💚
                 </span>
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               </div>
-              <span className="text-[10px] text-slate-400">حضور نشط ومستمع</span>
+              <span className="text-[10px] text-emerald-400/90 font-medium">حاضر وسامعك بكل اهتمام</span>
             </div>
           </div>
 
-          <span className="text-[10px] text-slate-400 bg-white/5 px-2.5 py-0.5 rounded-full">
+          <span className="text-[10px] text-slate-300 bg-white/10 px-2.5 py-1 rounded-full font-medium">
             {msg.timestamp || "الآن"}
           </span>
         </div>
 
         {/* Counselor Empathetic Body */}
-        <div className="text-sm sm:text-base leading-relaxed text-[#e5e2e3] pr-1 space-y-2 text-right relative z-10 font-normal">
+        <div className="text-sm sm:text-base leading-relaxed text-[#f1f5f9] pr-1 space-y-2 text-right relative z-10 font-normal">
           <p className="whitespace-pre-line">{msg.text}</p>
         </div>
 
-        {/* Action Utilities Pill Row (from Stitch UI design) */}
-        <div className="mt-4 pt-3 border-t border-white/5 flex flex-wrap items-center justify-between gap-2 relative z-10">
+        {/* Action Utilities Pill Row */}
+        <div className="mt-4 pt-3 border-t border-white/10 flex flex-wrap items-center justify-between gap-2 relative z-10">
           <div className="flex items-center gap-2">
             {/* Voice Synthesis Player Button */}
             <button
               onClick={() => onSpeak(msg.text, msg.id)}
-              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition active:scale-95 shadow-sm ${
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition active:scale-95 shadow-md ${
                 isPlayingThis
-                  ? "bg-rose-500/20 text-rose-300 border border-rose-500/30"
-                  : "bg-white/5 hover:bg-white/10 text-[#8ed5ff]"
+                  ? "bg-rose-500/25 text-rose-200 border border-rose-500/40 animate-pulse"
+                  : "bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30"
               }`}
             >
               {isPlayingThis ? (
@@ -111,17 +112,17 @@ export default function AndroidChatMessage({
                 </>
               ) : (
                 <>
-                  <Play className="w-3.5 h-3.5 fill-current text-[#38bdf8]" />
-                  <span>تشغيل الصوت</span>
+                  <Play className="w-3.5 h-3.5 fill-current text-emerald-400" />
+                  <span>استمع لصوت لوكي 🔊</span>
                 </>
               )}
 
               {/* Micro Audio Visualizer Wave */}
               <div className="flex items-center gap-0.5 h-3 px-0.5">
-                <span className={`w-0.5 rounded-full bg-[#8ed5ff] ${isPlayingThis ? "h-3 animate-bounce" : "h-1.5"}`} />
-                <span className={`w-0.5 rounded-full bg-[#8ed5ff] ${isPlayingThis ? "h-4 animate-bounce" : "h-2.5"}`} style={{ animationDelay: "100ms" }} />
-                <span className={`w-0.5 rounded-full bg-[#8ed5ff] ${isPlayingThis ? "h-2 animate-bounce" : "h-1"}`} style={{ animationDelay: "200ms" }} />
-                <span className={`w-0.5 rounded-full bg-[#8ed5ff] ${isPlayingThis ? "h-3.5 animate-bounce" : "h-2"}`} style={{ animationDelay: "300ms" }} />
+                <span className={`w-0.5 rounded-full ${isPlayingThis ? "bg-rose-300 h-3 animate-bounce" : "bg-emerald-400 h-1.5"}`} />
+                <span className={`w-0.5 rounded-full ${isPlayingThis ? "bg-rose-300 h-4 animate-bounce" : "bg-emerald-400 h-2.5"}`} style={{ animationDelay: "100ms" }} />
+                <span className={`w-0.5 rounded-full ${isPlayingThis ? "bg-rose-300 h-2 animate-bounce" : "bg-emerald-400 h-1"}`} style={{ animationDelay: "200ms" }} />
+                <span className={`w-0.5 rounded-full ${isPlayingThis ? "bg-rose-300 h-3.5 animate-bounce" : "bg-emerald-400 h-2"}`} style={{ animationDelay: "300ms" }} />
               </div>
             </button>
 
