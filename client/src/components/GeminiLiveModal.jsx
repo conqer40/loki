@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Mic, MicOff, X, Keyboard, Sparkles, Volume2 } from "lucide-react";
+import { PhoneOff, Mic, MicOff, Volume2, Sparkles, MessageSquare, Shield, Radio, Keyboard, X, Send } from "lucide-react";
 import { askLoki } from "../services/lokiBrain";
 import { playLokiVoice, stopLokiVoice } from "../services/lokiAudio";
 
@@ -9,78 +9,126 @@ export default function GeminiLiveModal({
   onSendMessage,
   voice,
   apiKey,
-  groqApiKey,
-  provider,
   currentMood,
 }) {
-  const [callState, setCallState] = useState("listening"); // "listening" | "thinking" | "speaking"
-  const [liveTranscript, setLiveTranscript] = useState("");
-  const [lokiReplyText, setLokiReplyText] = useState("");
+  const [callStatus, setCallStatus] = useState("connecting"); // "connecting" | "active" | "ended"
+  const [callDuration, setCallDuration] = useState(0);
   const [isMuted, setIsMuted] = useState(false);
-  const [hasSpeechSupport, setHasSpeechSupport] = useState(true);
-  const [manualInput, setManualInput] = useState("");
+  const [isLokiSpeakingState, setIsLokiSpeakingState] = useState(false);
+  const [liveTranscript, setLiveTranscript] = useState("");
+  const [lastLokiReply, setLastLokiReply] = useState("");
+  const [showSubtitles, setShowSubtitles] = useState(true);
+  const [showKeyboardInput, setShowKeyboardInput] = useState(false);
+  const [manualText, setManualText] = useState("");
 
   const recognitionRef = useRef(null);
-  const audioRef = useRef(null);
+  const isCallActiveRef = useRef(false);
   const silenceTimerRef = useRef(null);
   const latestSpeechRef = useRef("");
-  const isSpeakingRef = useRef(false);
+  const timerIntervalRef = useRef(null);
+
+  // Format call duration MM:SS
+  const formatTime = (secs) => {
+    const m = Math.floor(secs / 60).toString().padStart(2, "0");
+    const s = (secs % 60).toString().padStart(2, "0");
+    return `${m}:${s}`;
+  };
 
   useEffect(() => {
     if (!isOpen) {
-      cleanup();
+      endCallSession();
       return;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      setHasSpeechSupport(false);
-      setCallState("listening");
-    } else {
-      setHasSpeechSupport(true);
-      startLiveVoiceSession(SpeechRecognition);
-    }
+    isCallActiveRef.current = true;
+    setCallStatus("connecting");
+    setCallDuration(0);
+    setLiveTranscript("");
+    setLastLokiReply("");
+    setIsLokiSpeakingState(false);
+
+    // Call duration timer
+    timerIntervalRef.current = setInterval(() => {
+      setCallDuration((prev) => prev + 1);
+    }, 1000);
+
+    // Connect call and start continuous mic session
+    const connectTimer = setTimeout(() => {
+      if (!isCallActiveRef.current) return;
+      setCallStatus("active");
+
+      // Start continuous speech recognition
+      startContinuousMic();
+
+      // Loki speaks welcoming greeting on phone connection
+      const greeting = "ألو يا صاحبي، معاك وسامعك.. احكيلي عامل إيه النهاردة وطمني عليك؟";
+      setLastLokiReply(greeting);
+      speakLoki(greeting);
+    }, 800);
 
     return () => {
-      cleanup();
+      clearTimeout(connectTimer);
+      endCallSession();
     };
   }, [isOpen]);
 
-  const cleanup = () => {
-    stopAudio();
+  // Clean up and end call
+  const endCallSession = () => {
+    isCallActiveRef.current = false;
+    stopLokiVoice();
+    setIsLokiSpeakingState(false);
+
+    if (timerIntervalRef.current) {
+      clearInterval(timerIntervalRef.current);
+      timerIntervalRef.current = null;
+    }
+
+    if (silenceTimerRef.current) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
+    }
+
     if (recognitionRef.current) {
-      try { recognitionRef.current.abort(); } catch {}
+      try {
+        recognitionRef.current.onend = null;
+        recognitionRef.current.abort();
+      } catch {}
       recognitionRef.current = null;
     }
-    if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
   };
 
-  const stopAudio = () => {
-    stopLokiVoice();
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+  // Continuous Microphone Session (Like a real phone call)
+  const startContinuousMic = () => {
+    if (!isCallActiveRef.current) return;
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      console.warn("SpeechRecognition not available on this device");
+      return;
     }
-    isSpeakingRef.current = false;
-  };
 
-  const startLiveVoiceSession = (SpeechRecognition) => {
     try {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.abort();
+        } catch {}
+      }
+
       const rec = new SpeechRecognition();
       rec.lang = "ar-EG";
       rec.continuous = true;
       rec.interimResults = true;
+      rec.maxAlternatives = 1;
 
-      rec.onstart = () => {
-        setCallState("listening");
-      };
+      rec.onstart = () => {};
 
       rec.onresult = (event) => {
-        // BARGE-IN INTERRUPTION: When user speaks while Loki is speaking, cut audio off immediately!
-        if (isSpeakingRef.current) {
-          stopAudio();
-          setCallState("listening");
-        }
+        if (!isCallActiveRef.current) return;
+
+        // REAL BARGE-IN: If user speaks while Loki is talking, immediately cut Loki off!
+        stopLokiVoice();
+        setIsLokiSpeakingState(false);
 
         let interim = "";
         let final = "";
@@ -93,262 +141,289 @@ export default function GeminiLiveModal({
           }
         }
 
-        const currentText = final || interim;
-        if (currentText.trim()) {
-          setLiveTranscript(currentText);
-          latestSpeechRef.current = currentText;
+        const currentSpeech = (final || interim).trim();
+        if (currentSpeech) {
+          setLiveTranscript(currentSpeech);
+          latestSpeechRef.current = currentSpeech;
 
+          // Natural conversational pause detection (1.1s silence = user finished talking)
           if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
           silenceTimerRef.current = setTimeout(() => {
-            if (latestSpeechRef.current.trim()) {
-              handleUserSpeech(latestSpeechRef.current.trim());
+            const textToProcess = latestSpeechRef.current.trim();
+            if (textToProcess && isCallActiveRef.current) {
+              handleUserSpokeInCall(textToProcess);
               latestSpeechRef.current = "";
             }
           }, 1100);
         }
       };
 
-      rec.onerror = (e) => {
-        console.warn("Live mic error:", e);
-        if (isOpen && !isMuted) {
-          setTimeout(() => {
-            try { rec.start(); } catch {}
-          }, 600);
+      // PERPETUAL PHONE LOOP: If Android kills mic momentarily, instantly restart it!
+      rec.onend = () => {
+        if (isCallActiveRef.current && !isMuted) {
+          try {
+            rec.start();
+          } catch {
+            setTimeout(() => {
+              if (isCallActiveRef.current && !isMuted) {
+                try { rec.start(); } catch {}
+              }
+            }, 300);
+          }
         }
       };
 
-      rec.onend = () => {
-        if (isOpen && !isMuted) {
-          try { rec.start(); } catch {}
+      rec.onerror = (e) => {
+        if (isCallActiveRef.current && !isMuted) {
+          setTimeout(() => {
+            if (isCallActiveRef.current) {
+              try { rec.start(); } catch {}
+            }
+          }, 400);
         }
       };
 
       rec.start();
       recognitionRef.current = rec;
     } catch (err) {
-      console.warn("Voice session failed:", err);
-      setHasSpeechSupport(false);
+      console.warn("Could not start continuous speech recognition:", err);
     }
   };
 
-  const handleUserSpeech = async (spokenText) => {
-    if (!spokenText || isSpeakingRef.current) return;
-
-    setCallState("thinking");
-    setLiveTranscript(spokenText);
+  // Process user speech in real-time
+  const handleUserSpokeInCall = async (userText) => {
+    if (!userText || !isCallActiveRef.current) return;
 
     try {
       const data = await askLoki({
-        message: spokenText,
+        message: userText,
         userMood: currentMood,
         apiKey,
       });
 
-      const reply = data.reply || "معاك وسامعك يا صاحبي.. كمل أنا في ضهرك.";
-      setLokiReplyText(reply);
-      onSendMessage(spokenText, reply, data.suggestions);
+      if (!isCallActiveRef.current) return;
 
-      await playVoiceResponse(reply);
+      const reply = data.reply || "سامعك يا صاحبي ومتابع معاك.. كمل أنا في ضهرك.";
+      setLastLokiReply(reply);
+      setLiveTranscript("");
+
+      // Pass message to main chat history
+      onSendMessage(userText, reply, data.suggestions);
+
+      // Speak reply out loud
+      speakLoki(reply);
     } catch (err) {
-      console.error("Live voice error:", err);
-      setCallState("listening");
+      if (isCallActiveRef.current) {
+        const fallback = "معاك يا غالي وسامعك كويس.. كمل كلامك.";
+        setLastLokiReply(fallback);
+        speakLoki(fallback);
+      }
     }
   };
 
-  const playVoiceResponse = async (text) => {
-    isSpeakingRef.current = true;
-    setCallState("speaking");
+  // Loki Speak with animated visual state
+  const speakLoki = (text) => {
+    if (!isCallActiveRef.current) return;
 
+    setIsLokiSpeakingState(true);
     playLokiVoice(text, {
       onStart: () => {
-        isSpeakingRef.current = true;
-        setCallState("speaking");
+        if (isCallActiveRef.current) setIsLokiSpeakingState(true);
       },
       onEnd: () => {
-        isSpeakingRef.current = false;
-        setCallState("listening");
-        setLiveTranscript("");
+        if (isCallActiveRef.current) setIsLokiSpeakingState(false);
       },
       onError: () => {
-        isSpeakingRef.current = false;
-        setCallState("listening");
+        if (isCallActiveRef.current) setIsLokiSpeakingState(false);
       },
     });
   };
 
+  // Toggle Mute
   const toggleMute = () => {
     if (isMuted) {
       setIsMuted(false);
-      try { recognitionRef.current?.start(); } catch {}
+      startContinuousMic();
     } else {
       setIsMuted(true);
-      try { recognitionRef.current?.stop(); } catch {}
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.onend = null;
+          recognitionRef.current.abort();
+        } catch {}
+      }
     }
+  };
+
+  // Manual text send (if user prefers typing in noisy environment)
+  const handleSendManual = (e) => {
+    e?.preventDefault();
+    if (!manualText.trim()) return;
+    const text = manualText.trim();
+    setManualText("");
+    setShowKeyboardInput(false);
+    handleUserSpokeInCall(text);
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-between p-6 bg-[#0a0a0c] text-white select-none overflow-hidden animate-fade-in">
-      <audio ref={audioRef} className="hidden" />
+    <div className="fixed inset-0 z-50 flex flex-col justify-between p-4 sm:p-6 bg-gradient-to-b from-[#061017] via-[#091520] to-[#04090e] text-white select-none overflow-hidden animate-fade-in safe-top safe-bottom">
+      {/* Ambient Phone Glow Waves */}
+      <div
+        className={`absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full transition-all duration-700 pointer-events-none ${
+          isLokiSpeakingState
+            ? "bg-emerald-500/25 blur-3xl scale-125"
+            : "bg-teal-500/15 blur-3xl scale-100"
+        }`}
+      />
 
-      {/* Top Bar: Close (X) + Mode Pill */}
-      <div className="w-full flex items-center justify-between z-10 pt-2">
-        <button
-          onClick={onClose}
-          className="p-3 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white transition active:scale-95"
-          title="الرجوع للشات الكتابي"
-        >
-          <X className="w-5 h-5" />
-        </button>
-
-        {/* Gemini Live style status pill */}
-        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#1e1f20] border border-white/10 text-xs font-medium">
-          <span
-            className={`w-2 h-2 rounded-full ${
-              callState === "speaking"
-                ? "bg-rose-400 animate-ping"
-                : callState === "thinking"
-                ? "bg-purple-400 animate-pulse"
-                : "bg-[#a8c7fa] animate-pulse"
-            }`}
-          />
-          <span className="text-slate-200">
-            {callState === "speaking"
-              ? "لوكي بيتكلم..."
-              : callState === "thinking"
-              ? "بيحضر رده..."
-              : "لوكي سامعك لايف"}
-          </span>
+      {/* 1. Call Header Info */}
+      <div className="flex flex-col items-center pt-2 sm:pt-4 text-center z-10 space-y-1">
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-bold shadow-sm">
+          <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
+          <span>مكالمة لايف مشفرة 🔒</span>
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-3 rounded-full bg-white/10 hover:bg-white/15 text-slate-300 hover:text-white transition active:scale-95"
-          title="شات كتابي"
-        >
-          <Keyboard className="w-5 h-5" />
-        </button>
+        <h2 className="text-xl sm:text-2xl font-black text-white mt-1">لوكي (Loki) 💚</h2>
+
+        <p className="text-xs sm:text-sm font-semibold text-emerald-400">
+          {callStatus === "connecting"
+            ? "جاري الاتصال بـ لوكي... 📞"
+            : `متصل الآن • ${formatTime(callDuration)}`}
+        </p>
       </div>
 
-      {/* Center: The Iconic Gemini Live Fluid Morphing Orb */}
-      <div className="my-auto flex flex-col items-center justify-center relative">
-        {/* Ambient atmospheric backdrop glow */}
-        <div
-          className={`absolute rounded-full blur-[90px] transition-all duration-1000 pointer-events-none ${
-            callState === "speaking"
-              ? "w-96 h-96 bg-gradient-to-tr from-pink-600/30 via-purple-600/30 to-amber-500/25 scale-125"
-              : callState === "thinking"
-              ? "w-80 h-80 bg-gradient-to-tr from-indigo-600/25 via-purple-600/25 to-pink-500/20 animate-spin"
-              : "w-80 h-80 bg-gradient-to-tr from-cyan-500/20 via-blue-600/20 to-purple-600/20 scale-100"
-          }`}
-        />
+      {/* 2. Center Stage: Loki Caller Mascot with Live Pulsing Audio Waves */}
+      <div className="flex flex-col items-center justify-center my-auto z-10 py-6">
+        <div className="relative flex items-center justify-center">
+          {/* Outer Pulsing Wave Rings when Loki speaks */}
+          {isLokiSpeakingState && (
+            <>
+              <span className="absolute w-48 h-48 rounded-full bg-emerald-400/20 animate-ping" />
+              <span className="absolute w-56 h-56 rounded-full border-2 border-emerald-400/30 animate-pulse" />
+            </>
+          )}
 
-        {/* The Fluid Morphing Living Orb (Gemini Live Signature Visual) */}
-        <div
-          onClick={() => {
-            if (isSpeakingRef.current) {
-              stopAudio();
-              setCallState("listening");
-            }
-          }}
-          className={`relative w-56 h-56 rounded-full cursor-pointer flex items-center justify-center transition-all duration-700 active:scale-95 shadow-2xl ${
-            callState === "speaking"
-              ? "animate-morph-orb bg-gradient-to-tr from-[#ec4899] via-[#8b5cf6] to-[#f59e0b] shadow-purple-500/50 scale-110"
-              : callState === "thinking"
-              ? "animate-spin bg-gradient-to-tr from-[#6366f1] via-[#a855f7] to-[#ec4899] shadow-indigo-500/40"
-              : "animate-morph-orb bg-gradient-to-tr from-[#06b6d4] via-[#3b82f6] to-[#8b5cf6] shadow-cyan-500/30 hover:scale-105"
-          }`}
-        >
-          {/* Inner core reflection */}
-          <div className="w-40 h-40 rounded-full bg-black/20 backdrop-blur-md flex items-center justify-center border border-white/25">
+          {/* Caller Avatar */}
+          <div
+            className={`relative w-36 h-36 sm:w-44 sm:h-44 rounded-full overflow-hidden p-1 shadow-2xl transition-all duration-300 ${
+              isLokiSpeakingState
+                ? "bg-gradient-to-tr from-emerald-400 via-teal-300 to-cyan-300 scale-105 shadow-emerald-500/50"
+                : "bg-gradient-to-tr from-emerald-600 to-slate-700 shadow-black/80"
+            }`}
+          >
             <img
-              src="/logo.svg"
-              alt="Loki"
-              className={`w-24 h-24 object-contain transition-transform duration-500 ${
-                callState === "speaking" ? "scale-115" : "scale-100"
-              }`}
+              src="/loki_hero.jpg"
+              alt="لوكي"
+              className="w-full h-full object-cover rounded-full"
             />
           </div>
         </div>
 
-        {/* Helpful user cue */}
-        <div className="mt-10 text-center px-4 max-w-sm">
-          <p className="text-xs text-slate-400 leading-relaxed font-normal">
-            {callState === "speaking"
-              ? "💡 اتكلم في أي ثانية أو المس الشاشة ولوكي هيسكت فوراً عشان يسمعك"
-              : "اتكلم بصوتك بلهجتك المصرية الطبيعية وهو هيرد عليك كإنسان حقيقي"}
-          </p>
-        </div>
-
-        {/* Live Subtitle Transcript Bar */}
-        <div className="mt-6 min-h-[52px] max-w-md w-full px-4 text-center">
-          {liveTranscript && (
-            <p className="text-sm font-medium text-emerald-300 bg-emerald-950/40 border border-emerald-500/20 px-4 py-2.5 rounded-2xl animate-fade-in shadow-lg">
-              🗣️ "{liveTranscript}"
-            </p>
-          )}
-          {!liveTranscript && lokiReplyText && callState === "speaking" && (
-            <p className="text-sm font-normal text-purple-200 bg-purple-950/40 border border-purple-500/20 px-4 py-2.5 rounded-2xl line-clamp-3 animate-fade-in shadow-lg">
-              💜 "{lokiReplyText}"
+        {/* Live Call Dynamic Status Text */}
+        <div className="mt-5 text-center px-4 max-w-xs sm:max-w-md">
+          {isLokiSpeakingState ? (
+            <div className="flex items-center justify-center gap-2 text-emerald-300 font-bold text-sm sm:text-base animate-pulse">
+              <Volume2 className="w-5 h-5 text-emerald-400" />
+              <span>لوكي بيتكلم معاك دلوقتي...</span>
+            </div>
+          ) : liveTranscript ? (
+            <div className="flex items-center justify-center gap-2 text-teal-300 font-medium text-xs sm:text-sm">
+              <Mic className="w-4 h-4 text-emerald-400 animate-bounce" />
+              <span className="truncate">سامعك: "{liveTranscript}"</span>
+            </div>
+          ) : (
+            <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed">
+              تكلم براحتك.. المايك مفتوح والخط شغال زي مكالمة الفون بالظبط.
             </p>
           )}
         </div>
 
-        {/* Manual Input Fallback */}
-        {!hasSpeechSupport && (
-          <div className="mt-4 flex items-center gap-2 max-w-xs w-full">
+        {/* Real-time Subtitles Bubble (if enabled) */}
+        {showSubtitles && lastLokiReply && (
+          <div className="mt-4 px-4 py-2.5 max-w-sm rounded-2xl bg-[#0e1a24]/90 border border-emerald-500/20 text-xs text-slate-200 text-center shadow-lg animate-fade-in">
+            <span className="text-emerald-400 font-bold ml-1">لوكي:</span>
+            <span>{lastLokiReply}</span>
+          </div>
+        )}
+
+        {/* Keyboard Input Overlay (Optional for noisy places) */}
+        {showKeyboardInput && (
+          <form
+            onSubmit={handleSendManual}
+            className="mt-3 flex items-center gap-2 w-full max-w-sm px-2 animate-fade-in"
+          >
             <input
               type="text"
-              placeholder="اكتب كلامك هنا..."
-              value={manualInput}
-              onChange={(e) => setManualInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && manualInput.trim()) {
-                  handleUserSpeech(manualInput.trim());
-                  setManualInput("");
-                }
-              }}
-              className="flex-1 px-3 py-2 rounded-xl bg-[#1e1f20] border border-white/10 text-xs text-white"
+              value={manualText}
+              onChange={(e) => setManualText(e.target.value)}
+              placeholder="اكتب رسالتك ولوكي هيرد بصوته..."
+              className="flex-1 py-2 px-3 rounded-full bg-[#12202c] border border-emerald-500/30 text-xs text-white placeholder:text-slate-400 focus:outline-none"
+              autoFocus
             />
             <button
-              onClick={() => {
-                if (manualInput.trim()) {
-                  handleUserSpeech(manualInput.trim());
-                  setManualInput("");
-                }
-              }}
-              className="px-3 py-2 rounded-xl bg-purple-600 text-xs font-semibold"
+              type="submit"
+              className="p-2 rounded-full bg-emerald-500 text-black font-bold"
             >
-              إرسال
+              <Send className="w-4 h-4" />
             </button>
-          </div>
+          </form>
         )}
       </div>
 
-      {/* Bottom Floating Control Bar (ChatGPT / Gemini Android style) */}
-      <div className="w-full flex items-center justify-center gap-8 pb-4 z-10">
-        {/* Mute Mic Button */}
-        <button
-          onClick={toggleMute}
-          className={`p-4 rounded-full border transition active:scale-95 ${
-            isMuted
-              ? "bg-amber-600/30 border-amber-500/50 text-amber-300"
-              : "bg-[#1e1f20] border-white/10 hover:bg-[#282a2c] text-slate-200"
-          }`}
-          title={isMuted ? "إلغاء كتم المايك" : "كتم المايك"}
-        >
-          {isMuted ? <MicOff className="w-6 h-6" /> : <Mic className="w-6 h-6" />}
-        </button>
+      {/* 3. Bottom Phone Call Controls (True Phone UI) */}
+      <div className="flex flex-col items-center pb-4 z-10 space-y-4">
+        {/* Secondary Utilities Row (Mute, Subtitles, Keyboard) */}
+        <div className="flex items-center gap-4">
+          {/* Mute Toggle */}
+          <button
+            onClick={toggleMute}
+            className={`p-3.5 rounded-full transition active:scale-95 shadow-md flex items-center justify-center ${
+              isMuted
+                ? "bg-rose-500/30 border border-rose-500 text-rose-300"
+                : "bg-white/10 hover:bg-white/20 text-slate-200 border border-white/10"
+            }`}
+            title={isMuted ? "إلغاء كتم المايك" : "كتم المايك"}
+          >
+            {isMuted ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
 
-        {/* End Call / Close Live Button (Red circular button) */}
+          {/* Subtitles Toggle */}
+          <button
+            onClick={() => setShowSubtitles(!showSubtitles)}
+            className={`p-3.5 rounded-full transition active:scale-95 shadow-md flex items-center justify-center ${
+              showSubtitles
+                ? "bg-emerald-500/20 border border-emerald-400/40 text-emerald-300"
+                : "bg-white/10 hover:bg-white/20 text-slate-400 border border-white/10"
+            }`}
+            title="إظهار/إخفاء النص المكتوب"
+          >
+            <MessageSquare className="w-5 h-5" />
+          </button>
+
+          {/* Keyboard Input Toggle */}
+          <button
+            onClick={() => setShowKeyboardInput(!showKeyboardInput)}
+            className="p-3.5 rounded-full bg-white/10 hover:bg-white/20 text-slate-200 border border-white/10 transition active:scale-95 shadow-md"
+            title="كتابة نص"
+          >
+            <Keyboard className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* PRIMARY BIG RED "END CALL" BUTTON */}
         <button
-          onClick={onClose}
-          className="p-5 rounded-full bg-rose-600 hover:bg-rose-500 text-white shadow-xl shadow-rose-950/60 transition active:scale-95"
-          title="إنهاء الجلسة الصوتية"
+          onClick={() => {
+            endCallSession();
+            onClose();
+          }}
+          className="w-18 h-18 sm:w-20 sm:h-20 rounded-full bg-gradient-to-tr from-rose-600 to-red-500 hover:from-rose-500 hover:to-red-400 text-white shadow-2xl shadow-rose-950/80 flex items-center justify-center transition active:scale-90 border-2 border-white/20"
+          title="إنهاء المكالمة"
         >
-          <X className="w-7 h-7" />
+          <PhoneOff className="w-8 h-8 sm:w-9 sm:h-9" />
         </button>
+        <span className="text-[11px] text-slate-400 font-medium">إنهاء المكالمة</span>
       </div>
     </div>
   );

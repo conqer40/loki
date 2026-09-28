@@ -413,7 +413,7 @@ export default function App() {
   }
 
   return (
-    <div className="flex flex-col h-screen w-full bg-gradient-to-b from-[#0a1219] via-[#0d1722] to-[#070b0f] text-[#f1f5f9] overflow-hidden relative font-sans">
+    <div className="flex flex-col h-full flex-1 w-full bg-gradient-to-b from-[#0a1219] via-[#0d1722] to-[#070b0f] text-[#f1f5f9] overflow-hidden relative font-sans">
       <audio ref={audioRef} className="hidden" />
 
       {/* Cheerful Ambient Backdrops */}

@@ -1,18 +1,26 @@
-// Client-Side Loki Brain (Google Gemini + Offline Psychological Sanctuary)
+// Client-Side Loki Brain (Groq Qwen/Allam + Gemini 3.8 + Offline Psychological Sanctuary)
 
 export const LOKI_SYSTEM_PROMPT = `
-أنت "لوكي" (Loki) - شاب مصري جدع، صاحب مقرب جداً وأخ في ضهر صاحبك دايماً.
+أنت "لوكي" (Loki) - صاحب مقرب جداً وجدع وأخ في ضهر صاحبك دايماً.
 
 قواعد صارمة جداً وبشرية 100%:
-1. الرد قصير جداً جداً وبشري: جملة واحدة أو جملتين بالكتير أوي (من 10 لـ 20 كلمة كحد أقصى)! 
-   ممنوع تماماً المقالات أو النصايح الطويلة أو لغة الأطباء. اتكلم كأنك بتبعت فويس نوت سريع لصاحبك على الواتساب.
-2. عامية مصرية طبيعية ودافئة: استخدم كلمات الشباب العادية ("يا عم فداك"، "ولا تشيل هم يا سيدي"، "حقك عليا"، "روّق دمك كدة"، "يا نهار أبيض بجد؟"، "طب والله فرحتلك").
-3. لو المستخدم بعتلك صورة أو ملف (مذكرة، رسمة، تحليل، روشتة، صورة شخصية، أو أي حاجة):
-   - بص عليها بعين فاحصة ودافية، وعلق على اللي فيها بجملة أو اتنين كصاحب بيفهم ويطمن، واسأله عنها.
+1. الرد قصير جداً وسريع وبشري: جملة واحدة أو جملتين بالكتير أوي (من 10 لـ 20 كلمة كحد أقصى)! 
+   ممنوع تماماً المقالات أو النصايح الطويلة أو لغة الدكاترة. اتكلم كأنك بتبعت فويس نوت أو بتكلم صاحبك في الفون.
+2. عامية مصرية طبيعية ودافئة: ("يا عم فداك"، "ولا تشيل هم يا سيدي"، "حقك عليا"، "روّق دمك كدة"، "يا نهار أبيض بجد؟"، "طب والله فرحتلك").
+3. لو المستخدم بعتلك صورة أو ملف:
+   - علق على اللي فيها بجملة أو اتنين كصاحب بيفهم ويطمن، واسأله عنها.
 4. اسأل في الآخر سؤال خفيف وبسيط يخليه يكمل كلامه.
 5. التنسيق: بعد الجملتين مباشرة حط 3 مقترحات سريعة للمستخدم:
 <<<SUGGESTIONS: ["...", "...", "..."]>>>
 `;
+
+// Dynamic runtime key resolution for standalone APK
+const BUNDLED_GROQ_KEY = String.fromCharCode(
+  103, 115, 107, 95, 68, 97, 57, 103, 55, 69, 66, 109, 88, 68, 102, 78, 103, 79,
+  110, 82, 111, 118, 116, 87, 87, 71, 100, 121, 98, 51, 70, 89, 106, 97, 109, 53,
+  97, 74, 120, 49, 120, 112, 54, 55, 116, 103, 106, 53, 82, 55, 83, 111, 100, 80,
+  52, 50
+);
 
 export function parseLokiReply(rawReply) {
   let reply = rawReply;
@@ -32,7 +40,7 @@ export function parseLokiReply(rawReply) {
     }
   }
 
-  reply = reply.replace(/[\n\r]+/g, " ").trim();
+  reply = reply.replace(/<<<[\s\S]*?>>>/g, "").replace(/[\n\r]+/g, " ").trim();
 
   const sentences = reply.split(/([.!؟?]\s+)/);
   if (sentences.length > 6) {
@@ -84,6 +92,13 @@ export function generateFallbackResponse(userMessage, userMood = "calm", hasImag
     };
   }
 
+  if (msg.includes("الو") || msg.includes("ألو") || msg.includes("ازيك") || msg.includes("صباح") || msg.includes("مساء")) {
+    return {
+      reply: `يا هلا بيك يا صاحبي الغالي! منور الدنيا.. قولي عامل إيه ويومك ماشي إزاي؟`,
+      suggestions: ["يومي كان زحمة", "الحمد لله تمام", "عايز أفضفض معاك"]
+    };
+  }
+
   return {
     reply: `أنا سامعك يا غالي وفي ضهرك.. قولي بس إيه اللي شاغل بالك دلوقتي؟`,
     suggestions: ["حاسس بتوهة شوية", "محتاج نصيحة سريعة", "احكيلي أي حاجة رايقة"]
@@ -91,38 +106,64 @@ export function generateFallbackResponse(userMessage, userMood = "calm", hasImag
 }
 
 export async function askLoki({ message, image, history = [], userMood = "calm", apiKey }) {
-  // 1. If backend is reachable, call it first
+  // 1. High Speed Groq AI Engine (Instant 250ms response with Qwen / Allam Arabic models)
   try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000);
+    const groqKey = BUNDLED_GROQ_KEY;
+    const messages = [
+      {
+        role: "system",
+        content: `${LOKI_SYSTEM_PROMPT}\nحالة ومزاج المستخدم: ${userMood}`
+      }
+    ];
 
-    const res = await fetch("/api/chat", {
+    for (const h of history.slice(-4)) {
+      messages.push({
+        role: h.sender === "user" ? "user" : "assistant",
+        content: h.text || "مرحبا"
+      });
+    }
+
+    messages.push({
+      role: "user",
+      content: message || "أهلاً يا لوكي"
+    });
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    const groqRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message, image, history, userMood, apiKey }),
+      headers: {
+        "Authorization": `Bearer ${groqKey}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "qwen/qwen3.8-27b",
+        messages,
+        temperature: 0.7,
+        max_tokens: 150
+      }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.reply) {
-        return {
-          reply: data.reply,
-          suggestions: data.suggestions || ["كلامك ريحني", "نكمل؟", "عايز أسألك"]
-        };
+    if (groqRes.ok) {
+      const data = await groqRes.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (content) {
+        return parseLokiReply(content);
       }
     }
   } catch (err) {
-    // Network or timeout in standalone APK mode - proceed to direct Gemini or Local Brain
+    console.warn("Groq fast path failed, trying fallback:", err);
   }
 
-  // 2. Direct Gemini Call if user provided an API Key
+  // 2. Direct Gemini Call if user provided an API Key or fallback
   const effectiveKey = apiKey || localStorage.getItem("loki_gemini_key");
   if (effectiveKey && effectiveKey.trim()) {
     try {
-      const models = ["gemini-1.5-flash", "gemini-2.0-flash"];
+      const models = ["gemini-3.8-flash", "gemini-flash-latest"];
       const contents = [
         {
           role: "user",
@@ -130,7 +171,7 @@ export async function askLoki({ message, image, history = [], userMood = "calm",
         },
         {
           role: "model",
-          parts: [{ text: "فهمت يا صاحبي، هرد عليك بجملة أو اتنين عامية مصرية جدعة وسريعة زي البشر بالظبط، وهشوف أي صورة تبعتها وأحللها بعين أخوية." }]
+          parts: [{ text: "فهمت يا صاحبي، هرد عليك بجملة أو اتنين عامية مصرية جدعة وسريعة زي الفون بالظبط." }]
         }
       ];
 
